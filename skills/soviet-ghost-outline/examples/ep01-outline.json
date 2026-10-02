@@ -1,0 +1,171 @@
+{
+  "source": "《苏联亡灵局》EP01 验收样例",
+  "lang": "zh",
+  "params": {
+    "episodes": 3,
+    "minutesPerEpisode": 2,
+    "genre": "历史错位黑色幽默",
+    "adaptMode": "借壳",
+    "preferences": [],
+    "thresholds": {
+      "maxPayoffGap": 3
+    }
+  },
+  "adaptation": {
+    "core": "亡灵在冷静的行政流程中遭遇无法被表格容纳的历史身份。",
+    "keep": [
+      {
+        "what": "Karl 死于 1939 年，面对战后东德与西德的选择",
+        "why": "通过身份错位展示制度分类与个人经验的冲突",
+        "evidence": "Karl 死于 1939 年 → 1970 年亡灵局要求选择东德或西德"
+      }
+    ],
+    "cut": [
+      {
+        "what": "英雄式公开反抗",
+        "why": "避免把制度荒诞转化为个人胜利"
+      }
+    ],
+    "merge": [],
+    "risks": [],
+    "cutNote": "这意味着冲突由登记程序持续推动，而不是由英雄式反抗解决。",
+    "mergeNote": "主角组由 Karl 承担，以其历史认知与行政分类冲突作为主要人物视角。"
+  },
+  "characters": [
+    {
+      "id": "C01",
+      "name": "Karl",
+      "role": "亡灵登记者",
+      "tier": "lead",
+      "arc": "从确信自我身份明确，到意识到行政分类无法容纳生前经验。",
+      "from": [
+        "项目设定"
+      ]
+    },
+    {
+      "id": "C02",
+      "name": "登记窗口工作人员",
+      "role": "按程序办理亡灵登记",
+      "tier": "support",
+      "arc": "始终维持程序化工作方式，但开始注意到制度选项的边界。",
+      "from": [
+        "项目设定"
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "id": "S01",
+      "name": "中央亡灵管理局登记窗口",
+      "primary": true
+    }
+  ],
+  "payoffs": [
+    {
+      "id": "P001",
+      "episode": 1,
+      "level": "major",
+      "type": [
+        "historical_dislocation"
+      ],
+      "ontology": "historical_dislocation_A",
+      "setup": "Karl 的知识停留在 1939 年，登记流程要求他确认当前国家归属。",
+      "payoff": "地图只提供东德与西德两个选项，Karl 无法把它们对应到自己死亡时的德国。",
+      "theme": "制度分类与个人经验发生冲突。",
+      "tone": "冷峻克制",
+      "status": "confirmed",
+      "userConfirmed": true
+    },
+    {
+      "id": "P002",
+      "episode": 2,
+      "level": "minor",
+      "type": [
+        "world_rule_reveal"
+      ],
+      "ontology": "world_rule_reveal_A",
+      "setup": "登记窗口把超自然事务当成普通行政业务处理。",
+      "payoff": "工作人员以常规手续继续登记，呈现亡灵管理局日常化的运行规则。",
+      "theme": "制度分类与个人经验发生冲突。",
+      "tone": "冷峻克制",
+      "status": "confirmed",
+      "userConfirmed": true
+    },
+    {
+      "id": "P003",
+      "episode": 3,
+      "level": "minor",
+      "type": [
+        "emotional_payoff"
+      ],
+      "ontology": "emotional_payoff_A",
+      "setup": "工作人员注意到现有选项无法表达 Karl 的身份。",
+      "payoff": "工作人员留下短暂处理空档，让 Karl 再看一遍表格与地图。",
+      "theme": "制度分类与个人经验发生冲突。",
+      "tone": "克制",
+      "status": "confirmed",
+      "userConfirmed": true
+    }
+  ],
+  "historicalResearch": [
+    {
+      "id": "HR-EP01",
+      "claim": "EP01 使用 1939 年德国与战后东德、西德的历史错位作为已提供的故事前提。",
+      "status": "CANON",
+      "source": "工作文档给出的 EP01 核心剧情前提"
+    }
+  ],
+  "episodes": [
+    {
+      "ep": 1,
+      "synopsis": "Karl 随亡灵转运巴士进入中央亡灵管理局，排队来到登记窗口。工作人员查看档案后发现他的死亡年份是 1939 年，便把东德与西德的地图推到他面前，要求确认归属；Karl 无法理解这两个选项。",
+      "hook": "Karl 是否能在现有选项中确认自己的国家归属？",
+      "suspense": "登记系统是否允许填写一个未列出的历史身份？",
+      "sceneIds": [
+        "S01"
+      ],
+      "characterIds": [
+        "C01",
+        "C02"
+      ],
+      "payoffs": [
+        "P001"
+      ],
+      "warnings": []
+    },
+    {
+      "ep": 2,
+      "synopsis": "窗口工作人员按既定流程继续处理档案，展示亡灵登记业务如何像普通行政事务一样运作。Karl 仍无法把自己的记忆与地图上的选项对应起来。",
+      "hook": "工作人员会如何处理表格之外的答案？",
+      "suspense": "登记程序是否存在补充说明或例外栏？",
+      "sceneIds": [
+        "S01"
+      ],
+      "characterIds": [
+        "C01",
+        "C02"
+      ],
+      "payoffs": [
+        "P002"
+      ],
+      "warnings": []
+    },
+    {
+      "ep": 3,
+      "synopsis": "工作人员没有改变登记规则，只把档案暂时放在一旁，给 Karl 留出再次查看地图与表格的时间。两人都没有解释这个动作，办理流程随后继续。",
+      "hook": "这次停顿会不会改变 Karl 的登记结果？",
+      "suspense": "工作人员是否会在后续程序中再次为他留出空间？",
+      "sceneIds": [
+        "S01"
+      ],
+      "characterIds": [
+        "C01",
+        "C02"
+      ],
+      "payoffs": [
+        "P003"
+      ],
+      "warnings": []
+    }
+  ]
+}
