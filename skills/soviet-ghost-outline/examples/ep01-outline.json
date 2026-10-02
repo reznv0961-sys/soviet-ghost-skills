@@ -1,63 +1,206 @@
+```json
 {
-  "source": "《苏联亡灵局》EP01 验收样例",
+  "source": "《苏联亡灵局》EP01",
   "lang": "zh",
   "params": {
-    "episodes": 3,
-    "minutesPerEpisode": 2,
-    "genre": "历史错位黑色幽默",
-    "adaptMode": "借壳",
-    "preferences": [],
-    "thresholds": {
-      "maxPayoffGap": 3
-    }
+    "episodes": 1,
+    "minutesPerEpisode": 1,
+    "genre": "制度荒诞、历史错位、冷幽默",
+    "preferences": [
+      "手绘2D半写实",
+      "低饱和",
+      "克制表演",
+      "单集独立成立并保留弱连续长线"
+    ]
   },
-  "adaptation": {
-    "core": "亡灵在冷静的行政流程中遭遇无法被表格容纳的历史身份。",
-    "keep": [
+  "canonRefs": [
+    {
+      "id": "CANON-TEMP-WORLD-001",
+      "summary": "故事发生在1970年前后的苏联，亡灵真实存在，但其存在对普通公众严格保密。",
+      "source": "《苏联亡灵局》项目世界观设定文档"
+    },
+    {
+      "id": "CANON-TEMP-INST-001",
+      "summary": "莫斯科中央亡灵管理局位于人烟稀少的郊外封闭院区，由专门警卫看守，亡灵通过统一转运车辆进入。",
+      "source": "《苏联亡灵局》项目世界观设定文档"
+    },
+    {
+      "id": "CANON-TEMP-INST-002",
+      "summary": "中央亡灵管理局已经运行多年，亡灵登记、分类、转运等超自然事务被内部工作人员当作普通行政工作处理。",
+      "source": "《苏联亡灵局》项目世界观设定文档"
+    },
+    {
+      "id": "CANON-TEMP-KARL-001",
+      "summary": "Karl是1939年波兰战役中阵亡的德国国防军普通士兵，死亡时二十岁出头，对之后数十年的历史变化缺乏直接认知。",
+      "source": "《苏联亡灵局》项目世界观设定文档"
+    },
+    {
+      "id": "CANON-TEMP-HEROINE-001",
+      "summary": "女主人公是中央亡灵管理局Window No.4的年轻工作人员，以熟练、克制、程序化的方式处理亡灵登记事务。",
+      "source": "《苏联亡灵局》项目世界观设定文档"
+    }
+  ],
+  "storyDesign": {
+    "core": "一个死于1939年的德国青年亡灵第一次进入1970年前后的苏联中央亡灵管理局，并被现代行政系统要求在自己从未认识过的东德与西德之间确认国家归属。",
+    "include": [
       {
-        "what": "Karl 死于 1939 年，面对战后东德与西德的选择",
-        "why": "通过身份错位展示制度分类与个人经验的冲突",
-        "evidence": "Karl 死于 1939 年 → 1970 年亡灵局要求选择东德或西德"
+        "what": "通过Karl第一次进入中央亡灵管理局的过程自然展示机构运作方式。",
+        "why": "第一集需要让观众通过行动和环境理解世界，而不是依赖旁白解释设定。"
+      },
+      {
+        "what": "以东德与西德的行政二选一作为本集核心叙事回报。",
+        "why": "这一问题同时连接Karl的死亡年代、战后历史变化、身份分类和苏联式行政程序，是第一集最集中的世界观与人物冲突。"
+      },
+      {
+        "what": "保留亡者无国界海报、谨慎作答、手续变简单却出现大量文件、亡灵咖啡机等连续荒诞细节。",
+        "why": "这些细节共同建立系列的核心喜剧语法：所有角色都把超自然和历史错位当作正常行政事务。"
+      },
+      {
+        "what": "以Karl注意到亡灵咖啡机作为结尾世界线索。",
+        "why": "不制造强制悬念，而是暗示这个机构已经形成完整、日常化的亡灵生活体系，为后续故事留下自然延伸空间。"
       }
     ],
-    "cut": [
+    "exclude": [
       {
-        "what": "英雄式公开反抗",
-        "why": "避免把制度荒诞转化为个人胜利"
+        "what": "大段旁白解释亡灵管理局的历史和制度。",
+        "why": "第一集优先让观众通过院区、登记流程、宣传物和工作人员行为自行理解世界规则。"
+      },
+      {
+        "what": "Karl公开质疑或激烈反抗登记制度。",
+        "why": "第一集的冲突来自历史认知与行政分类之间的结构性错位，不应升级成英雄式对抗。"
+      },
+      {
+        "what": "女主人公主动解释东西德历史背景。",
+        "why": "她应当把这一问题视作普通登记事项，解释历史会削弱制度冷幽默。"
       }
     ],
     "merge": [],
-    "risks": [],
-    "cutNote": "这意味着冲突由登记程序持续推动，而不是由英雄式反抗解决。",
-    "mergeNote": "主角组由 Karl 承担，以其历史认知与行政分类冲突作为主要人物视角。"
+    "risks": [
+      {
+        "what": "第一集同时承担人物介绍、世界观建立和多个荒诞点，存在信息过密风险。",
+        "why": "所有信息必须依附Karl的实际行动顺序出现，避免额外解释；每个荒诞点保持短促，不停下来讲解笑点。"
+      },
+      {
+        "what": "东西德问题容易被表现成纯历史知识笑话。",
+        "why": "重点应放在一个来自1939年的亡灵被现代行政系统强制重新分类，而不是要求观众掌握复杂冷战史。"
+      },
+      {
+        "what": "AI视频涉及车辆、铁门、半透明亡灵、地图文字和文件交互等高风险内容。",
+        "why": "大纲阶段只登记风险；后续分镜必须拆分复杂动作，避免让单一镜头同时承担过多空间运动和道具交互。"
+      }
+    ]
   },
   "characters": [
     {
       "id": "C01",
       "name": "Karl",
-      "role": "亡灵登记者",
+      "role": "刚被转运至中央亡灵管理局、第一次接触现代亡灵行政体系的德国青年亡灵。",
       "tier": "lead",
-      "arc": "从确信自我身份明确，到意识到行政分类无法容纳生前经验。",
+      "arc": "从谨慎观察陌生机构，到发现自己熟悉的国家身份已经无法直接对应现实行政分类，并开始意识到死亡之后的世界已经发生巨大变化。",
       "from": [
-        "项目设定"
+        "项目Canon"
       ]
     },
     {
       "id": "C02",
-      "name": "登记窗口工作人员",
-      "role": "按程序办理亡灵登记",
-      "tier": "support",
-      "arc": "始终维持程序化工作方式，但开始注意到制度选项的边界。",
+      "name": "Window No.4女职员",
+      "role": "中央亡灵管理局登记工作人员，以完全职业化的方式处理Karl的历史身份问题。",
+      "tier": "lead",
+      "arc": "本集保持熟练而克制的公务员状态；她对Karl遭遇的历史错位有所注意，但仍首先按照既有程序继续工作，为后续人物关系保留空间。",
       "from": [
-        "项目设定"
+        "项目Canon"
+      ]
+    },
+    {
+      "id": "C03",
+      "name": "院门警卫",
+      "role": "负责中央亡灵管理局院门车辆检查与放行的警卫。",
+      "tier": "functional",
+      "from": [
+        "项目Canon"
       ]
     }
   ],
   "scenes": [
     {
       "id": "S01",
-      "name": "中央亡灵管理局登记窗口",
-      "primary": true
+      "name": "中央亡灵管理局院外与铁门",
+      "primary": true,
+      "reuseClass": "recurring",
+      "productionRisk": {
+        "level": "high",
+        "reasons": [
+          "vehicle_motion",
+          "multi_actor_interaction",
+          "complex_spatial_blocking",
+          "moving_door",
+          "character_consistency"
+        ]
+      }
+    },
+    {
+      "id": "S02",
+      "name": "亡灵转运巴士内部",
+      "primary": false,
+      "reuseClass": "recurring",
+      "productionRisk": {
+        "level": "high",
+        "reasons": [
+          "vehicle_motion",
+          "background_parallax",
+          "transparent_character",
+          "character_consistency"
+        ]
+      }
+    },
+    {
+      "id": "S03",
+      "name": "中央亡灵管理局接待大厅",
+      "primary": true,
+      "reuseClass": "core",
+      "productionRisk": {
+        "level": "medium",
+        "reasons": [
+          "multi_actor_interaction",
+          "transparent_character",
+          "text_or_map",
+          "character_consistency"
+        ]
+      }
+    },
+    {
+      "id": "S04",
+      "name": "Window No.4登记窗口",
+      "primary": true,
+      "reuseClass": "core",
+      "productionRisk": {
+        "level": "high",
+        "reasons": [
+          "prop_handoff",
+          "text_or_map",
+          "hand_closeup",
+          "transparent_character",
+          "character_consistency"
+        ]
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "P01",
+      "name": "Karl的转送档案袋",
+      "function": "承载Karl的身份与死亡资料，并将巴士转运阶段和Window No.4登记阶段连接起来。",
+      "beatIds": [
+        "P001"
+      ]
+    },
+    {
+      "id": "P02",
+      "name": "德国归属地图与登记表",
+      "function": "把Karl复杂的历史身份压缩成东德与西德的行政二选一，是核心叙事回报的直接执行道具。",
+      "beatIds": [
+        "P001"
+      ]
     }
   ],
   "payoffs": [
@@ -66,106 +209,106 @@
       "episode": 1,
       "level": "major",
       "type": [
-        "historical_dislocation"
+        "historical_dislocation",
+        "identity_conflict",
+        "bureaucratic_absurdity"
       ],
-      "ontology": "historical_dislocation_A",
-      "setup": "Karl 的知识停留在 1939 年，登记流程要求他确认当前国家归属。",
-      "payoff": "地图只提供东德与西德两个选项，Karl 无法把它们对应到自己死亡时的德国。",
-      "theme": "制度分类与个人经验发生冲突。",
-      "tone": "冷峻克制",
-      "status": "confirmed",
-      "userConfirmed": true
-    },
-    {
-      "id": "P002",
-      "episode": 2,
-      "level": "minor",
-      "type": [
-        "world_rule_reveal"
+      "ontologies": [
+        "historical_dislocation_A",
+        "identity_conflict_B",
+        "bureaucratic_absurdity_A"
       ],
-      "ontology": "world_rule_reveal_A",
-      "setup": "登记窗口把超自然事务当成普通行政业务处理。",
-      "payoff": "工作人员以常规手续继续登记，呈现亡灵管理局日常化的运行规则。",
-      "theme": "制度分类与个人经验发生冲突。",
-      "tone": "冷峻克制",
-      "status": "confirmed",
-      "userConfirmed": true
-    },
-    {
-      "id": "P003",
-      "episode": 3,
-      "level": "minor",
-      "type": [
-        "emotional_payoff"
-      ],
-      "ontology": "emotional_payoff_A",
-      "setup": "工作人员注意到现有选项无法表达 Karl 的身份。",
-      "payoff": "工作人员留下短暂处理空档，让 Karl 再看一遍表格与地图。",
-      "theme": "制度分类与个人经验发生冲突。",
-      "tone": "克制",
+      "setup": "Karl于1939年死亡，他对德国的认知停留在死亡年代；进入1970年前后的中央亡灵管理局后，现代行政系统需要为他确定当前国家归属。",
+      "payoff": "Window No.4的登记程序只提供东德与西德两个现实选项，要求Karl从中确认自己的国家归属，而Karl无法把这两个选项与自己死亡时所理解的德国对应起来。",
+      "theme": "个人的历史经验并不会随着政治边界变化自动更新，但行政系统仍需要把每个人放进当前存在的分类之中。",
+      "tone": "冷静、程序化、无人主动解释其中的荒谬。",
       "status": "confirmed",
       "userConfirmed": true
     }
   ],
-  "historicalResearch": [
-    {
-      "id": "HR-EP01",
-      "claim": "EP01 使用 1939 年德国与战后东德、西德的历史错位作为已提供的故事前提。",
-      "status": "CANON",
-      "source": "工作文档给出的 EP01 核心剧情前提"
-    }
-  ],
+  "historicalResearch": [],
   "episodes": [
     {
       "ep": 1,
-      "synopsis": "Karl 随亡灵转运巴士进入中央亡灵管理局，排队来到登记窗口。工作人员查看档案后发现他的死亡年份是 1939 年，便把东德与西德的地图推到他面前，要求确认归属；Karl 无法理解这两个选项。",
-      "hook": "Karl 是否能在现有选项中确认自己的国家归属？",
-      "suspense": "登记系统是否允许填写一个未列出的历史身份？",
+      "synopsis": "一辆统一转运亡灵的巴士抵达莫斯科郊外的中央亡灵管理局。警卫完成例行检查后放行车辆，Karl随巴士进入院区，并在途中谨慎观察这个陌生机构。进入接待大厅后，他看到宣传亡者超越国界的官方海报，以及排队等待办理事务的其他亡灵。Karl来到Window No.4，将转送档案交给女职员。女职员查看资料并确认他死于1939年，随后按照现行登记程序要求他在东德与西德之间确定国家归属。Karl无法理解这两个选项，女职员却仍以普通公务流程的态度等待他的回答，并提醒他需要谨慎作答。随着登记继续，一个看似令手续变简单的信息反而对应着桌面上大量需要处理的文件。离开窗口或等待下一步手续时，Karl又注意到大厅内存在专门供亡灵使用的咖啡机，进一步意识到这里早已形成一套成熟而日常化的亡灵行政生活。",
+      "episodePurpose": [
+        "character_introduction",
+        "world_reveal",
+        "institutional_satire",
+        "historical_observation",
+        "tone_establishment"
+      ],
+      "audienceGain": {
+        "newUnderstanding": "观众理解亡灵并不是游离于现代社会之外的神秘存在，而是已经被苏联国家机器纳入成熟的登记、分类和日常管理体系；来自不同时代的亡灵仍必须被重新放入当代行政分类。",
+        "storyProgress": "正式介绍Karl、Window No.4女职员和中央亡灵管理局，并建立历史错位、官僚荒诞与克制冷幽默作为系列的核心叙事语法。"
+      },
+      "endingPull": {
+        "kind": "world_clue",
+        "content": "Karl注意到大厅内专门供亡灵使用的咖啡机，并短暂观察这个显然已经稳定运行多年的机构；观众由此意识到刚刚经历的登记荒诞只是这个世界日常机制的一小部分。"
+      },
       "sceneIds": [
-        "S01"
+        "S01",
+        "S02",
+        "S03",
+        "S04"
       ],
       "characterIds": [
         "C01",
-        "C02"
+        "C02",
+        "C03"
       ],
       "payoffs": [
         "P001"
       ],
-      "warnings": []
-    },
-    {
-      "ep": 2,
-      "synopsis": "窗口工作人员按既定流程继续处理档案，展示亡灵登记业务如何像普通行政事务一样运作。Karl 仍无法把自己的记忆与地图上的选项对应起来。",
-      "hook": "工作人员会如何处理表格之外的答案？",
-      "suspense": "登记程序是否存在补充说明或例外栏？",
-      "sceneIds": [
-        "S01"
+      "comicBeats": [
+        {
+          "kind": "visual_absurdity",
+          "beat": "Karl进入接待大厅后看到宣称亡者超越国界的官方宣传海报，而整个机构正在持续对亡灵进行国籍和身份分类。",
+          "function": "在核心冲突出现前先埋下官方理想口号与现实行政实践之间的轻微反差，同时建立苏联式宣传环境。"
+        },
+        {
+          "kind": "historical_mismatch",
+          "beat": "女职员把Karl的国家归属作为普通登记项目处理，并要求这个死于1939年的人在东德与西德之间作出选择。",
+          "function": "将宏大的战后历史变化压缩成一个极其普通的窗口二选一，并直接兑现本集核心payoff。"
+        },
+        {
+          "kind": "dry_capper",
+          "beat": "面对Karl实际上没有简单正确答案的身份问题，女职员仍以认真而职业化的态度提醒他必须谨慎作答。",
+          "function": "用完全正常的行政语气进一步放大历史错位的荒诞，同时确立女主人公的冷幽默表达方式。"
+        },
+        {
+          "kind": "procedural_gag",
+          "beat": "女职员判断某项新信息会让后续手续简单许多，但画面中的待处理文件数量却随之显得更加庞大。",
+          "function": "让行政语言中的简单与实际文书负担形成视觉反差，表现工作人员已经完全适应这种官僚逻辑。"
+        },
+        {
+          "kind": "visual_absurdity",
+          "beat": "Karl注意到接待大厅内存在专门供亡灵使用的咖啡机，而周围没有任何人认为这值得特别说明。",
+          "function": "把本集从国家身份和历史分类的宏观荒诞重新落回日常生活细节，并以一个安静的世界规则笑点结束。"
+        }
       ],
-      "characterIds": [
-        "C01",
-        "C02"
+      "productionRisk": {
+        "level": "high",
+        "reasons": [
+          "vehicle_motion",
+          "multi_actor_interaction",
+          "complex_spatial_blocking",
+          "prop_handoff",
+          "hand_closeup",
+          "transparent_character",
+          "moving_door",
+          "background_parallax",
+          "text_or_map",
+          "character_consistency"
+        ]
+      },
+      "propIds": [
+        "P01",
+        "P02"
       ],
-      "payoffs": [
-        "P002"
-      ],
-      "warnings": []
-    },
-    {
-      "ep": 3,
-      "synopsis": "工作人员没有改变登记规则，只把档案暂时放在一旁，给 Karl 留出再次查看地图与表格的时间。两人都没有解释这个动作，办理流程随后继续。",
-      "hook": "这次停顿会不会改变 Karl 的登记结果？",
-      "suspense": "工作人员是否会在后续程序中再次为他留出空间？",
-      "sceneIds": [
-        "S01"
-      ],
-      "characterIds": [
-        "C01",
-        "C02"
-      ],
-      "payoffs": [
-        "P003"
-      ],
+      "crowdPlan": "C03院门警卫只出现在院外车辆检查段；C01 Karl与C02女职员的主要互动发生在Window No.4。三名登记角色不需要在同一镜头或同一场次同时出现，大厅中的其他亡灵作为不追踪身份的背景角色处理。",
       "warnings": []
     }
   ]
 }
+```
