@@ -1,6 +1,8 @@
 # 叙事回报因果结构
 
-Ontology（本体结构）描述一项叙事回报成立所需的因果形状，不是固定剧情模板。`payoffs[].ontology` 使用对应的标识，例如 `bureaucratic_absurdity_A`。
+Ontology（本体结构）描述一项叙事回报成立所需的因果形状，不是固定剧情模板。新版使用 `payoffs[].ontologies` 数组，例如 `["bureaucratic_absurdity_A", "dry_comedy_A"]`。一个 payoff 可引用多个 ontology；不得为了单选而丢弃有效结构。旧 `ontology` 单字符串只用于兼容读取。
+
+Ontology 与 payoff type 均允许多标签。每个 ontology 表示其中一个 type 的因果结构；组合标签应分别说明不同机制，不要重复命名同一个观察。
 
 ## `bureaucratic_absurdity`（官僚荒诞）
 

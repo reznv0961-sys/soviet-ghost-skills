@@ -11,13 +11,17 @@ import { fileURLToPath } from 'node:url';
 /* 常量与阈值                                                           */
 /* ------------------------------------------------------------------ */
 /*
- * 阈值参数化：叙事回报间隔因平台和项目而异。
- * outline.json 的 params.thresholds 可以逐项覆盖，不改代码。
+ * 生产规模阈值按项目参数覆盖；旧 maxPayoffGap 仅保留输入兼容，
+ * 不再作为《苏联亡灵局》的核心结构要求。
  */
 
 export const ADAPT_MODES = ['忠实', '抽核', '借壳'];
 export const PAYOFF_LEVELS = ['major', 'minor'];
 export const BEAT_WEIGHTS = PAYOFF_LEVELS;
+export const ENDING_PULL_KINDS = ['question', 'world_clue', 'character_reaction', 'ironic_image', 'long_arc', 'none'];
+export const SCENE_REUSE_CLASSES = ['core', 'recurring', 'episode_only'];
+export const PRODUCTION_RISK_LEVELS = ['low', 'medium', 'high'];
+export const HISTORICAL_CATEGORIES = ['historical_fact', 'historical_plausibility', 'fictional_institution_design'];
 export const PAYOFF_TYPES = [
   'bureaucratic_absurdity',
   'historical_dislocation',
@@ -30,6 +34,7 @@ export const PAYOFF_TYPES = [
   'emotional_payoff',
   'delayed_payoff',
 ];
+export const ONTOLOGIES = PAYOFF_TYPES.flatMap((type) => [`${type}_A`, `${type}_B`]);
 
 /*
  * 角色分档。一刀切的「有名字角色 ≤ 6」混淆了两件事：观众要记住谁、
@@ -52,7 +57,6 @@ export const DEFAULT_THRESHOLDS = {
   maxLeads: 5,          // 主角组上限（男女主 + 主反派）
   maxSupport: 10,       // 有名字的重要配角上限
   maxFunctional: 10,    // 功能性角色上限（占脸不占名，name 用称呼标签）
-  maxPayoffGap: 3,      // 相邻叙事回报最大间隔（集）
   maxProps: 8,          // 叙事道具上限。跟主角数量一个量级——收多了就不是叙事道具，
                         //   是场景陈设，那归 novel-art 的场景锚点管
   // maxPrimaryScenes 不在这里——它随集数动态，见 primarySceneCap()
@@ -181,14 +185,12 @@ const thText = (s) => typeof s === 'string' && s.trim();
 function thresholdsOf(outline) {
   const explicit = outline?.params?.thresholds ?? {};
   const th = { ...DEFAULT_THRESHOLDS, ...explicit };
-  if (explicit.maxPayoffGap === undefined && explicit.maxBeatGap !== undefined) th.maxPayoffGap = explicit.maxBeatGap;
-  th.maxBeatGap = th.maxPayoffGap;
   if (explicit.maxPrimaryScenes === undefined) th.maxPrimaryScenes = primarySceneCap(outline?.params?.episodes);
   return th;
 }
 
-/** 每集的正文字段，关键词扫描和对白检查都扫这三栏。 */
-const EP_TEXT_FIELDS = ['synopsis', 'hook', 'suspense'];
+/** 叙述体检查覆盖梗概与可能出现的叙事描述，不检查结构化 ID。 */
+const EP_TEXT_FIELDS = ['synopsis', 'endingPull'];
 const TONE_DRIFT_PATTERNS = [
   '打脸', '逆袭', '震惊全场', '所有人都惊呆', '霸气', '王者', '碾压',
   '热血', '怒吼', '强势归来', '狠狠', '复仇成功',
@@ -207,6 +209,75 @@ function payoffTypes(payoff) {
   return Array.isArray(payoff?.type) ? payoff.type : typeof payoff?.type === 'string' ? [payoff.type] : [];
 }
 
+function payoffOntologies(payoff) {
+  if (Array.isArray(payoff?.ontologies)) return payoff.ontologies;
+  return typeof payoff?.ontology === 'string' ? [payoff.ontology] : [];
+}
+
+function productionRiskProblems(value, label) {
+  if (value === undefined) return [];
+  if (!value || typeof value !== 'object' || !PRODUCTION_RISK_LEVELS.includes(value.level) || !Array.isArray(value.reasons)) {
+    return [`${label} productionRisk 必须包含有效 level（low/medium/high）和 reasons 数组`];
+  }
+  return [];
+}
+
+function isModernEpisode(outline, episode) {
+  return Boolean(outline?.storyDesign || episode?.episodePurpose !== undefined || episode?.endingPull !== undefined);
+}
+
+function episodeHasComicBeat(episode) {
+  return Array.isArray(episode?.comicBeats) && episode.comicBeats.some((beat) =>
+    thText(beat?.kind) && thText(beat?.beat) && thText(beat?.function),
+  );
+}
+
+function episodeHasConfirmedPayoff(episode, payoffs) {
+  const byId = new Map(payoffs.map((payoff) => [payoff?.id, payoff]));
+  const ids = Array.isArray(episode?.payoffs) ? episode.payoffs : [];
+  return ids.some((id) => {
+    const payoff = byId.get(id);
+    return payoff?.status === 'confirmed' && payoff?.userConfirmed === true;
+  });
+}
+
+function storyDesignOf(outline) {
+  const legacy = outline?.adaptation;
+  const design = outline?.storyDesign ?? (legacy ? {
+    core: legacy.core,
+    include: legacy.keep ?? [],
+    exclude: legacy.cut ?? [],
+    merge: legacy.merge ?? [],
+    risks: (legacy.risks ?? []).map((risk) => ({ what: risk.what, why: risk.why ?? risk.plan })),
+    cutNote: legacy.cutNote,
+    mergeNote: legacy.mergeNote,
+  } : {});
+  const include = design.include ?? [];
+  const exclude = design.exclude ?? [];
+  if (outline?.storyDesign) {
+    return {
+      ...outline.storyDesign,
+      core: outline.storyDesign.core ?? '',
+      include,
+      exclude,
+      keep: include,
+      cut: exclude,
+      merge: outline.storyDesign.merge ?? [],
+      risks: outline.storyDesign.risks ?? [],
+    };
+  }
+  return {
+    ...design,
+    core: design.core ?? '',
+    include,
+    exclude,
+    keep: include,
+    cut: exclude,
+    merge: design.merge ?? [],
+    risks: design.risks ?? [],
+  };
+}
+
 function payoffTypeLabel(payoff) {
   return payoffTypes(payoff).join(' + ');
 }
@@ -219,7 +290,8 @@ export function toneDriftWarnings(outline) {
     const linked = new Set(e?.payoffs ?? []);
     const related = payoffs.filter((payoff) => linked.has(payoff?.id));
     const text = [
-      ...EP_TEXT_FIELDS.map((f) => e?.[f] ?? ''),
+      ...EP_TEXT_FIELDS.map((f) => (f === 'endingPull' ? e?.endingPull?.content : e?.[f]) ?? ''),
+      e?.hook ?? '', e?.suspense ?? '',
       ...related.flatMap((payoff) => [payoff?.setup, payoff?.payoff, payoff?.theme]),
     ].join(' ');
     for (const pattern of TONE_DRIFT_PATTERNS) {
@@ -285,63 +357,32 @@ export function gateReport(outline) {
   }
 
   // G3 一次性场景要有规避方案
-  const onceNoPlan = scenes.filter((s) => sceneUse.get(s?.id) === 1 && !thText(s?.reusePlan));
+  const onceNoPlan = scenes.filter((s) =>
+    sceneUse.get(s?.id) === 1 &&
+    (s?.reuseClass === 'episode_only' || !s?.reuseClass) &&
+    !thText(s?.reusePlan),
+  );
   add(
     'once-scene',
-    '一次性场景已标注规避方案',
+    '一次性场景已标注复用方案',
     eps.length > 0 && onceNoPlan.length === 0,
     onceNoPlan.length ? `缺：${onceNoPlan.map((s) => s.name ?? s.id).join('、')}` : '',
-  );
-
-  // G4 叙事回报间隔 ≤ N，首尾无真空
-  const maxPayoffGap = th.maxPayoffGap ?? th.maxBeatGap ?? DEFAULT_THRESHOLDS.maxPayoffGap;
-  const beatEps = [...new Set(beats.map((b) => b?.episode).filter((n) => Number.isInteger(n)))].sort((a, b) => a - b);
-  let gapOk = beatEps.length > 0 && total > 0;
-  let gapDetail = '';
-  if (gapOk) {
-    if (beatEps[0] > maxPayoffGap) {
-      gapOk = false;
-      gapDetail = `开头 ${beatEps[0] - 1} 集叙事回报真空`;
-    }
-    for (let i = 1; i < beatEps.length && gapOk; i++) {
-      if (beatEps[i] - beatEps[i - 1] > maxPayoffGap) {
-        gapOk = false;
-        gapDetail = `第 ${beatEps[i - 1]}–${beatEps[i]} 集之间叙事回报断档`;
-      }
-    }
-    if (gapOk && total - beatEps[beatEps.length - 1] >= maxPayoffGap) {
-      gapOk = false;
-      gapDetail = `结尾 ${total - beatEps[beatEps.length - 1]} 集叙事回报真空`;
-    }
-  }
-  add('payoff-gap', `叙事回报间隔 ≤ ${maxPayoffGap} 集，无真空区`, gapOk, gapDetail, 'beat-gap');
-
-  // G5 第 1 集有钩子
-  add('ep1-hook', '第 1 集有钩子', eps.length > 0 && thText(eps[0]?.hook), '');
-
-  // G6 大爆点不能到最后一集才第一次出现
-  const majors = beats.filter((b) => payoffLevel(b) === 'major').map((b) => b.episode);
-  add(
-    'major-early',
-    '大爆点不在最后一集才首次出现',
-    majors.length > 0 && Math.min(...majors) < total,
-    majors.length ? `最早在第 ${Math.min(...majors)} 集` : '没有 major 叙事回报',
   );
 
   const unconfirmed = beats.filter((payoff) => payoff?.userConfirmed !== true || payoff?.status !== 'confirmed');
   add(
     'payoff-confirmation',
     '所有叙事回报均已由用户确认',
-    beats.length > 0 && unconfirmed.length === 0,
+    unconfirmed.length === 0,
     unconfirmed.length ? `待确认：${unconfirmed.map((payoff) => payoff?.id ?? '(无 id)').join('、')}` : '',
   );
   const unknownTypes = beats.flatMap((payoff) => {
     const types = payoffTypes(payoff);
     const invalid = types.filter((type) => !PAYOFF_TYPES.includes(type));
     if (!Array.isArray(payoff?.type) || types.length === 0) invalid.push('(missing type)');
-    const ontology = payoff?.ontology;
-    if (!types.some((type) => ontology === `${type}_A` || ontology === `${type}_B`)) {
-      invalid.push(`ontology=${ontology ?? '(missing)'}`);
+    const ontologies = payoffOntologies(payoff);
+    if (ontologies.length === 0 || ontologies.some((ontology) => !ONTOLOGIES.includes(ontology) || !types.some((type) => ontology.startsWith(`${type}_`)))) {
+      invalid.push(`ontologies=${ontologies.join(',') || '(missing)'}`);
     }
     return invalid.map((type) => `${payoff?.id ?? '(no id)'}: ${type}`);
   });
@@ -355,22 +396,68 @@ export function gateReport(outline) {
   const unresolvedHistory = historicalResearch.filter((item) => item?.status === 'RESEARCH_REQUIRED');
   add(
     'historical-research',
-    '历史研究问题已解决',
-    (outline?.historicalResearch === undefined || Array.isArray(outline.historicalResearch)) && unresolvedHistory.length === 0,
-    unresolvedHistory.length
-      ? `待确认：${unresolvedHistory.map((item) => item?.id ?? item?.claim ?? '(无编号)').join('、')}`
+    '未解决的历史事实依赖已处理',
+    (outline?.historicalResearch === undefined || Array.isArray(outline.historicalResearch)) &&
+      unresolvedHistory.every((item) => item?.category === 'fictional_institution_design'),
+    unresolvedHistory.some((item) => item?.category !== 'fictional_institution_design')
+      ? `待确认：${unresolvedHistory.filter((item) => item?.category !== 'fictional_institution_design').map((item) => item?.id ?? item?.claim ?? '(无编号)').join('、')}`
       : !Array.isArray(outline?.historicalResearch) && outline?.historicalResearch !== undefined
         ? 'historicalResearch 必须是数组'
         : '',
   );
 
-  // G7 每集三栏齐全（钩子/悬念必填）
-  const incomplete = eps.filter((e) => !EP_TEXT_FIELDS.every((f) => thText(e?.[f])));
+  // 单集独立成立：synopsis + episodePurpose/audienceGain，结尾不强制 cliffhanger。
+  const incomplete = eps.filter((e) => {
+    const legacyEnding = !e?.endingPull && thText(e?.hook) && thText(e?.suspense);
+    const newDesignIncomplete =
+      !legacyEnding &&
+      (!Array.isArray(e?.episodePurpose) ||
+      e.episodePurpose.length === 0 ||
+        !e.episodePurpose.every(thText) ||
+        !e?.audienceGain ||
+        !thText(e.audienceGain.newUnderstanding) ||
+        !thText(e.audienceGain.storyProgress));
+    const endingIncomplete = e?.endingPull
+      ? !ENDING_PULL_KINDS.includes(e.endingPull.kind)
+      : !legacyEnding;
+    return !thText(e?.synopsis) || newDesignIncomplete || endingIncomplete;
+  });
   add(
     'ep-fields',
-    '每集梗概三栏齐全（含【钩子】【悬念】）',
+    '每集梗概、存在理由、观众收获与结尾形式齐全',
     eps.length > 0 && incomplete.length === 0,
     incomplete.length ? `缺栏：第 ${incomplete.map((e) => e.ep).join('、')} 集` : '',
+  );
+  const valueBad = eps.filter((episode) => !episodeHasConfirmedPayoff(episode, beats) && !episodeHasComicBeat(episode));
+  add(
+    'episode-value',
+    '每集至少有已确认 payoff 或有效 comicBeat',
+    eps.length > 0 && valueBad.length === 0,
+    valueBad.length
+      ? `第 ${valueBad.map((e) => String(e.ep).padStart(2, '0')).join('、')} 集既没有已确认的 payoff，也没有 comicBeat；每集必须至少提供一种有效叙事回报或荒诞/滑稽点。`
+      : '',
+  );
+  const endingBad = eps.filter((e) =>
+    e?.endingPull !== undefined &&
+    (!ENDING_PULL_KINDS.includes(e.endingPull?.kind) ||
+      (e.endingPull.kind !== 'none' && !thText(e.endingPull.content)) ||
+      (e.endingPull.kind === 'none' && e.endingPull.content !== undefined && typeof e.endingPull.content !== 'string')),
+  );
+  add('ending-pull', 'endingPull 格式有效（允许 none）', endingBad.length === 0,
+    endingBad.length ? `格式错误：第 ${endingBad.map((e) => e.ep).join('、')} 集` : '');
+  const missingEpisodeRisk = eps.filter((e) => isModernEpisode(outline, e) && e?.productionRisk === undefined);
+  const riskBadFields = [
+    ...eps.flatMap((e) => productionRiskProblems(e?.productionRisk, `第 ${e?.ep} 集`)),
+    ...scenes.flatMap((s) => productionRiskProblems(s?.productionRisk, `场景 ${s?.id ?? ''}`)),
+  ];
+  add(
+    'production-risk',
+    '新版分集已填写 AI 视频生产风险',
+    riskBadFields.length === 0 && missingEpisodeRisk.length === 0,
+    [
+      ...riskBadFields,
+      ...(missingEpisodeRisk.length ? [`缺少字段：第 ${missingEpisodeRisk.map((e) => e.ep).join('、')} 集`] : []),
+    ].join('；'),
   );
 
   // G8 三人以上同框要有拆解方案
@@ -385,9 +472,13 @@ export function gateReport(outline) {
   // G9 生成难点进预警清单（关键词扫描，宁可多报）
   const riskBad = [];
   for (const e of eps) {
-    const text = EP_TEXT_FIELDS.map((f) => e?.[f] ?? '').join(' ');
+    const text = [e?.synopsis ?? '', e?.endingPull?.content ?? '', e?.hook ?? '', e?.suspense ?? ''].join(' ');
+    const reasonFor = { 雨戏: 'weather', 肢体接触: 'physical_contact', 人群: 'crowd', 手部特写: 'hand_closeup' };
     for (const [risk, re] of Object.entries(RISK_PATTERNS)) {
-      if (re.test(text) && !(e?.warnings ?? []).includes(risk)) riskBad.push(`第 ${e.ep} 集缺「${risk}」`);
+      const notedInLegacy = (e?.warnings ?? []).includes(risk);
+      const reasons = Array.isArray(e?.productionRisk?.reasons) ? e.productionRisk.reasons : [];
+      const notedInProduction = reasons.includes(reasonFor[risk]);
+      if (re.test(text) && !notedInLegacy && !notedInProduction) riskBad.push(`第 ${e.ep} 集缺「${risk}」`);
     }
   }
   add('risk-flag', '生成难点已进预警清单', eps.length > 0 && riskBad.length === 0, riskBad.join('；'));
@@ -442,7 +533,10 @@ export function gateReport(outline) {
   );
 
   // G11 梗概是叙述体
-  const dlgBad = eps.filter((e) => EP_TEXT_FIELDS.some((f) => DIALOGUE_RE.test(e?.[f] ?? '')));
+  const dlgBad = eps.filter((e) =>
+    [e?.synopsis, e?.endingPull?.content, e?.hook, e?.suspense, ...(e?.comicBeats ?? []).flatMap((beat) => [beat?.beat, beat?.function])]
+      .some((text) => DIALOGUE_RE.test(text ?? '')),
+  );
   add(
     'no-dialogue',
     '梗概是叙述体，无引号对白',
@@ -458,7 +552,7 @@ export function gateReport(outline) {
 /* ------------------------------------------------------------------ */
 /*
  * 三档 stage 就是流程门：
- *   skeleton — 改编说明 + 人物 + 场景（快版拍板前）
+ *   skeleton — 故事设计 + Canon refs + 人物 + 场景（快版拍板前）
  *   beats    — skeleton + confirmed payoffs（写分集之前必须过这档）
  *   full     — 全部（默认）
  * 「步骤 4 完成前不允许写分集梗概」靠这个变成可执行的，而不是一句话。
@@ -475,37 +569,40 @@ export function validateOutline(outline, stage = 'full') {
   // --- params ---
   const params = outline.params;
   if (!params || typeof params !== 'object') {
-    p('缺少 params（总集数/单集时长/题材/改编幅度）');
+    p('缺少 params（总集数/单集时长/题材）');
   } else {
     if (!Number.isInteger(params.episodes) || params.episodes < 1) p('params.episodes 必须是正整数');
     if (!(params.minutesPerEpisode > 0)) p('params.minutesPerEpisode 必须大于 0');
     if (!thText(params.genre)) p('params.genre 缺失——项目题材不能缺');
-    if (!ADAPT_MODES.includes(params.adaptMode)) {
+    if (params.adaptMode !== undefined && params.adaptMode !== null && !ADAPT_MODES.includes(params.adaptMode)) {
       p(`params.adaptMode 必须是 ${ADAPT_MODES.join('/')}，实际是 ${JSON.stringify(params.adaptMode)}`);
     }
   }
 
-  // --- adaptation 改编说明 ---
-  const ad = outline.adaptation;
-  if (!ad || typeof ad !== 'object') {
-    p('缺少 adaptation（改编说明）');
+  // --- storyDesign 故事设计；adaptation 仅作旧格式兼容 ---
+  const design = storyDesignOf(outline);
+  if ((!outline.storyDesign || typeof outline.storyDesign !== 'object') && (!outline.adaptation || typeof outline.adaptation !== 'object')) {
+    p('缺少 storyDesign（故事设计）');
   } else {
-    if (!thText(ad.core)) p('adaptation.core 缺失——一句话核心是整份大纲的锚');
-    for (const key of ['keep', 'cut', 'merge', 'risks']) {
-      if (!Array.isArray(ad[key])) p(`adaptation.${key} 必须是数组`);
-    }
-    if (Array.isArray(ad.keep) && ad.keep.length === 0) p('adaptation.keep 至少要有一条——什么都不保还改编什么');
-    if (params?.adaptMode && params.adaptMode !== '忠实' && Array.isArray(ad.cut) && ad.cut.length === 0) {
-      p(`adaptMode=${params.adaptMode} 却一条线都没砍，说不过去`);
-    }
-    for (const [key, fields] of [['keep', ['what', 'why']], ['cut', ['what', 'why']], ['merge', ['what', 'why']], ['risks', ['what', 'plan']]]) {
-      for (const item of ad[key] ?? []) {
-        for (const f of fields) if (!thText(item?.[f])) p(`adaptation.${key} 里有条目缺 ${f}`);
+    if (!thText(design.core)) p('storyDesign.core 缺失——故事核心是整份大纲的锚');
+    for (const key of ['include', 'exclude', 'merge', 'risks']) {
+      if (!Array.isArray(design[key])) p(`storyDesign.${key} 必须是数组`);
+      for (const item of design[key] ?? []) {
+        for (const f of ['what', 'why']) if (!thText(item?.[f])) p(`storyDesign.${key} 里有条目缺 ${f}`);
       }
     }
-    // 决策补注（可选）：给了就不能是空壳
-    for (const f of ['cutNote', 'mergeNote']) {
-      if (ad[f] !== undefined && !thText(ad[f])) p(`adaptation.${f} 给了但是空的——要么写结论，要么删掉这个键`);
+  }
+  if (outline.sourceAdaptation !== undefined) {
+    const sourceAdaptation = outline.sourceAdaptation;
+    if (!sourceAdaptation || !ADAPT_MODES.includes(sourceAdaptation.mode) || !thText(sourceAdaptation.source) || !Array.isArray(sourceAdaptation.notes)) {
+      p('sourceAdaptation 必须包含有效 mode、source 与 notes 数组');
+    }
+  }
+
+  if (outline.canonRefs !== undefined && !Array.isArray(outline.canonRefs)) p('canonRefs 必须是数组');
+  for (const ref of Array.isArray(outline.canonRefs) ? outline.canonRefs : []) {
+    if (!thText(ref?.id) || !thText(ref?.summary) || !thText(ref?.source)) {
+      p('canonRefs 条目必须包含 id、summary 与 source');
     }
   }
 
@@ -553,6 +650,13 @@ export function validateOutline(outline, stage = 'full') {
       seen.add(s?.id);
       if (!thText(s?.name)) p(`[${s?.id}] 场景缺 name`);
       if (typeof s?.primary !== 'boolean') p(`[${label}] 场景缺 primary（是不是主场景）`);
+      if (s?.reuseClass !== undefined && !SCENE_REUSE_CLASSES.includes(s.reuseClass)) {
+        p(`[${label}] reuseClass 必须是 ${SCENE_REUSE_CLASSES.join('/')}`);
+      }
+      if (outline.storyDesign && !SCENE_REUSE_CLASSES.includes(s?.reuseClass)) {
+        p(`[${label}] 新版 storyDesign 大纲必须填写 reuseClass`);
+      }
+      problems.push(...productionRiskProblems(s?.productionRisk, `场景 ${label}`));
     }
   }
 
@@ -579,11 +683,8 @@ export function validateOutline(outline, stage = 'full') {
   // --- payoffs 叙事回报表 ---
   if (outline.payoffs !== undefined && !Array.isArray(outline.payoffs)) p('payoffs 必须是数组');
   const beats = payoffsOf(outline);
-  if (beats.length === 0) {
-    p('payoffs 为空——叙事回报表是排片的骨架');
-  } else {
-    const seen = new Set();
-    for (const b of beats) {
+  const seen = new Set();
+  for (const b of beats) {
       const label = b?.id ?? '(无 id)';
       if (!/^P\d{3,}$/.test(b?.id ?? '')) p(`[${label}] payoff id 必须是 P001 这种格式`);
       if (seen.has(b?.id)) p(`payoff id ${b.id} 重复`);
@@ -591,21 +692,24 @@ export function validateOutline(outline, stage = 'full') {
       const types = payoffTypes(b);
       if (!Array.isArray(b?.type) || types.length === 0) p(`[${label}] type 必须是至少一项的 payoff type 数组`);
       for (const type of types) if (!PAYOFF_TYPES.includes(type)) p(`[${label}] 未知 payoff type：${type}，需用户确认 taxonomy`);
-      if (!types.some((type) => b?.ontology === `${type}_A` || b?.ontology === `${type}_B`)) {
-        p(`[${label}] ontology 必须是已列出 type 对应的 ontology pattern`);
+      const ontologies = payoffOntologies(b);
+      if (ontologies.length === 0 || ontologies.some((ontology) =>
+        !ONTOLOGIES.includes(ontology) || !types.some((type) => ontology.startsWith(`${type}_`)),
+      )) {
+        p(`[${label}] ontologies 必须是已列出 type 对应的 ontology pattern 数组`);
       }
       if (!PAYOFF_LEVELS.includes(payoffLevel(b))) p(`[${label}] level 只能是 ${PAYOFF_LEVELS.join('/')}`);
       if (!Number.isInteger(b?.episode) || b.episode < 1) p(`[${label}] episode 必须是正整数`);
-      for (const f of ['ontology', 'setup', 'payoff', 'theme', 'tone']) if (!thText(b?.[f])) p(`[${label}] 缺 ${f}`);
+      for (const f of ['setup', 'payoff', 'theme', 'tone']) if (!thText(b?.[f])) p(`[${label}] 缺 ${f}`);
+      if (!Array.isArray(b?.ontologies) && !thText(b?.ontology)) p(`[${label}] 缺 ontologies`);
       if (!['proposed', 'confirmed', 'rejected', 'revised'].includes(b?.status)) p(`[${label}] status 必须是 proposed/confirmed/rejected/revised`);
       if (typeof b?.userConfirmed !== 'boolean') p(`[${label}] userConfirmed 必须是布尔值`);
       if (b?.userConfirmed === true && b?.status !== 'confirmed') p(`[${label}] userConfirmed=true 时 status 必须为 confirmed`);
-    }
-    // 间隔、major 时机与用户确认在 beats 档就要卡住——这些错了，分集写完全废
-    for (const g of gateReport(outline)) {
-      if ((g.id === 'payoff-gap' || g.id === 'major-early' || g.id === 'payoff-confirmation' || g.id === 'payoff-types') && !g.ok) {
-        p(`质量门未过：${g.label}${g.detail ? `（${g.detail}）` : ''}`);
-      }
+  }
+  // 有 payoff 时检查人工确认与 taxonomy；payoffs 为空是合法状态。
+  for (const g of gateReport(outline)) {
+    if ((g.id === 'payoff-confirmation' || g.id === 'payoff-types') && !g.ok) {
+      p(`质量门未过：${g.label}${g.detail ? `（${g.detail}）` : ''}`);
     }
   }
 
@@ -624,9 +728,32 @@ export function validateOutline(outline, stage = 'full') {
       if (!Array.isArray(e?.sceneIds) || e.sceneIds.length === 0) p(`第 ${e?.ep} 集缺 sceneIds`);
       if (!Array.isArray(e?.characterIds) || e.characterIds.length === 0) p(`第 ${e?.ep} 集缺 characterIds`);
       if (e?.warnings !== undefined && !Array.isArray(e.warnings)) p(`第 ${e?.ep} 集 warnings 必须是数组`);
-      if (!Array.isArray(e?.payoffs)) p(`第 ${e?.ep} 集缺 payoffs 数组（无回报时写空数组并说明 rationale）`);
-      if (Array.isArray(e?.payoffs) && e.payoffs.length === 0 && !thText(e?.payoffRationale)) {
-        p(`第 ${e?.ep} 集没有 payoff，需说明 payoffRationale`);
+      if (!Array.isArray(e?.payoffs)) p(`第 ${e?.ep} 集缺 payoffs 数组（无结构性 payoff 时填写空数组；该集仍须有有效 comicBeat）`);
+      if (e?.comicBeats !== undefined && !Array.isArray(e.comicBeats)) p(`第 ${e?.ep} 集 comicBeats 必须是数组`);
+      for (const beat of e?.comicBeats ?? []) {
+        for (const field of ['kind', 'beat', 'function']) {
+          if (!thText(beat?.[field])) p(`第 ${e?.ep} 集 comicBeat 缺少 ${field}`);
+        }
+      }
+      if (e?.episodePurpose !== undefined && (!Array.isArray(e.episodePurpose) || !e.episodePurpose.every(thText))) {
+        p(`第 ${e?.ep} 集 episodePurpose 必须是字符串数组`);
+      }
+      if (e?.audienceGain !== undefined) {
+        if (typeof e.audienceGain !== 'object' || !thText(e.audienceGain.newUnderstanding) || !thText(e.audienceGain.storyProgress)) {
+          p(`第 ${e?.ep} 集 audienceGain 必须包含 newUnderstanding 与 storyProgress`);
+        }
+      }
+      if (e?.endingPull !== undefined) {
+        if (!ENDING_PULL_KINDS.includes(e.endingPull?.kind)) p(`第 ${e?.ep} 集 endingPull.kind 无效`);
+        if (e.endingPull?.kind !== 'none' && !thText(e.endingPull?.content)) p(`第 ${e?.ep} 集 endingPull.content 不能为空`);
+        if (e.endingPull?.kind === 'none' && e.endingPull.content !== undefined && typeof e.endingPull.content !== 'string') {
+          p(`第 ${e?.ep} 集 endingPull.kind 为 none 时 content 必须是字符串或省略`);
+        }
+      }
+      if (isModernEpisode(outline, e) && e?.productionRisk === undefined) {
+        p(`第 ${e?.ep} 集缺 productionRisk（可填写 {level: "low", reasons: []}）`);
+      } else {
+        problems.push(...productionRiskProblems(e?.productionRisk, `第 ${e?.ep} 集`));
       }
     });
     const payoffById = new Map(beats.map((payoff) => [payoff?.id, payoff]));
@@ -635,6 +762,7 @@ export function validateOutline(outline, stage = 'full') {
         const payoff = payoffById.get(id);
         if (!payoff) p(`第 ${e.ep} 集引用了不存在的 payoff ${id}`);
         else if (payoff.episode !== e.ep) p(`payoff ${id} 的落点是第 ${payoff.episode} 集，但被第 ${e.ep} 集引用`);
+        else if (payoff.status !== 'confirmed' || payoff.userConfirmed !== true) p(`第 ${e.ep} 集不能引用未确认的 payoff ${id}`);
       }
     }
     for (const payoff of beats) {
@@ -650,11 +778,23 @@ export function validateOutline(outline, stage = 'full') {
           p(`历史研究 ${item?.id ?? '(无 id)'} 的 status 必须是 CANON/PROVISIONAL/RESEARCH_REQUIRED`);
         }
         if (!thText(item?.id) || !thText(item?.claim)) p('historicalResearch 条目必须包含 id 与 claim');
+        if (item?.category !== undefined && !HISTORICAL_CATEGORIES.includes(item.category)) {
+          p(`历史研究 ${item?.id ?? '(无 id)'} 的 category 无效`);
+        }
+        if (item?.category === undefined && (item?.storyImpact !== undefined || outline.schemaVersion === '1.1')) {
+          p(`历史研究 ${item?.id ?? '(无 id)'} 缺少 category`);
+        }
+        if (item?.category !== undefined && !thText(item?.storyImpact)) {
+          p(`历史研究 ${item?.id ?? '(无 id)'} 缺少 storyImpact`);
+        }
+        if (item?.status === 'RESEARCH_REQUIRED' && !thText(item?.storyImpact)) {
+          p(`历史研究 ${item?.id ?? '(无 id)'} 缺少 storyImpact`);
+        }
       }
     }
     // 其余全部质量门（beats 档已报过的门不再重复）
     for (const g of gateReport(outline)) {
-      if (['payoff-gap', 'major-early', 'payoff-confirmation', 'payoff-types'].includes(g.id)) continue;
+      if (['payoff-confirmation', 'payoff-types'].includes(g.id)) continue;
       if (!g.ok) p(`质量门未过：${g.label}${g.detail ? `（${g.detail}）` : ''}`);
     }
   }
@@ -675,7 +815,10 @@ export function computeAssets(outline) {
 
   const scenes = (outline?.scenes ?? []).map((s) => {
     const episodes = eps.filter((e) => (e?.sceneIds ?? []).includes(s.id)).map((e) => e.ep);
-    return { id: s.id, name: s.name, primary: !!s.primary, uses: episodes.length, episodes, reusePlan: s.reusePlan ?? null };
+    return {
+      id: s.id, name: s.name, primary: !!s.primary, reuseClass: s.reuseClass ?? null,
+      uses: episodes.length, episodes, reusePlan: s.reusePlan ?? null, productionRisk: s.productionRisk ?? null,
+    };
   });
 
   const characters = (outline?.characters ?? []).map((c) => {
@@ -734,13 +877,13 @@ const GATE_LABELS_EN = {
   'functional-cap': 'Functional roles ≤ {0}',
   'scene-cap': 'Primary scenes ≤ {0}',
   'once-scene': 'One-off scenes carry a reuse plan',
-  'beat-gap': 'Narrative payoff gap ≤ {0} episodes, no dead zone',
   'payoff-confirmation': 'All narrative payoffs are user-confirmed',
   'payoff-types': 'All narrative payoff types use the approved taxonomy',
-  'historical-research': 'Historical research questions are resolved',
-  'ep1-hook': 'Episode 1 has a hook',
-  'major-early': 'Major payoffs do not first appear only in the final episode',
-  'ep-fields': 'All three fields per episode (synopsis, hook, suspense)',
+  'historical-research': 'Unresolved historical dependencies are addressed',
+  'episode-value': 'Each episode has a confirmed payoff or a comic beat',
+  'ending-pull': 'Ending pull is valid, including none',
+  'production-risk': 'AI video production risk fields are valid',
+  'ep-fields': 'Each episode has synopsis, purpose, audience gain, and ending form',
   'crowd-plan': 'Three or more on screen carries a breakdown plan',
   'risk-flag': 'Production risks flagged in the warning list',
   'prop-cap': 'Narrative props ≤ {0}',
@@ -772,7 +915,7 @@ const I18N = {
     kicker: '《苏联亡灵局》叙事大纲',
     docTitle: (s) => `${s} · 叙事大纲`,
     paramsLine: (p) =>
-      `${p.episodes} 集 × ${p.minutesPerEpisode} 分钟 · ${p.genre} · ${p.adaptMode}改编`,
+      `${p.episodes} 集 × ${p.minutesPerEpisode} 分钟 · ${p.genre}${p.adaptMode ? ` · ${p.adaptMode}改编` : ' · 原创系列'}`,
     exportJson: '导出 JSON',
     gates: '质量门',
     gatesPass: '全部通过',
@@ -782,30 +925,32 @@ const I18N = {
       decisions: '关键决策', rhythm: '叙事回报节奏', episodes: '分集梗概',
       episodesOverview: '分集概览', matrix: '每集调度矩阵',
       sceneOverview: '场景概览', plan: '资产量折算', gates: '质量门',
-      adaptation: '改编说明', characters: '人物表', beats: '叙事回报表', assets: '资产清单',
+      adaptation: '故事设计', canonRefs: '项目 Canon 依赖', characters: '人物表', beats: '叙事回报表', assets: '资产清单',
     },
     dec: {
-      cut: '砍了哪条线', merge: '合了哪些人', majors: 'major payoff 落在第几集',
+      cut: '不纳入的内容', merge: '合并的内容', majors: 'major payoff 落点',
       castSlots: (n, l, s, f) => `${n} 个角色位（主角组 ${l} · 重要配角 ${s} · 功能性 ${f}）`,
       leads: '主角组', noCut: '未砍线（忠实改编）', noMajor: '没有 major 叙事回报',
       first: '首个', final: '终局',
     },
     secNotes: {
       decisions: '拍板过的三件事，落进纸面',
-      rhythm: (gap) => `间隔 ≤ ${gap} 集 · 无真空区`,
-      episodes: '核心交付 · 每集三栏齐全',
+      rhythm: '叙事回报落点分布（不设固定频率门槛）',
+      episodes: '核心交付 · 单集结构、目的与观众收获',
       matrix: '一列 = 这一集要谁、在哪拍',
       sceneOverview: '右上 = 出现集',
       plan: '按档自动折算 · 不让模型写',
-      adaptation: '为什么这么改 · 附原文依据',
+      adaptation: '故事核心与设计取舍',
     },
     kpi: {
       episodes: '总集数', perEp: (m) => `× ${m} 分钟`, runtime: (m) => `正片约 ${m} 分钟`,
-      beats: '叙事回报', beatsSub: (major, gap) => `${major} 个 major${gap ? ` · 最大间隔 ${gap} 集` : ''}`,
+      beats: '叙事回报', beatsSub: (major) => `${major} 个 major`,
       cast: '角色', castSub: (l, s, f) => `主角 ${l} · 配角 ${s} · 功能 ${f}`,
       scenes: '主场景', scenesOnce: (n) => (n ? `一次性场景 ${n}，需复用方案` : '无一次性场景'),
-      risks: '生成难点', risksNone: '预警清单为空',
-      mode: '改编幅度', modeSub: (cut, merge) => `砍 ${cut} 线 · 合 ${merge} 组`,
+      risks: '生成难点',       risksNone: '暂无高风险集',
+      mode: '故事来源', modeSub: (source) => source,
+      comicSummary: (payoff, comic, both, high, core, recurring, episodeOnly) =>
+        `单集价值：${payoff} 集有 payoff · ${comic} 集有 comicBeat · ${both} 集两者兼有 · ${high} 集高生产风险 · 场景复用 core ${core} / recurring ${recurring} / episode_only ${episodeOnly}`,
     },
     legendMajor: 'major 回报', legendMinor: 'minor 回报',
     gapNote: (n) => `— ${n} 集空档 —`,
@@ -813,7 +958,7 @@ const I18N = {
     showAllEps: (n) => `展开全部 ${n} 集`,
     assetsAuto: '（由分集数据自动汇总）',
     core: '一句话核心',
-    keep: '保留', cut: '砍掉', merge: '合并', risks: '风险与对策',
+    keep: '纳入', cut: '不纳入', merge: '合并', risks: '风险与处理',
     what: '内容', why: '理由', plan: '对策', evidence: '原文依据',
     charCols: ['ID', '角色', '层级', '定位', '人物弧', '← 改动记录'],
     tier: TIER_LABELS,
@@ -827,7 +972,7 @@ const I18N = {
     planPropSpec: '每件一套白底设定图 + 状态变体，跨集要长一样',
     planRiskRow: '生成难点',
     planRiskSpec: '拍摄前逐条过预警清单',
-    beatCols: ['ID', '类型', '量级', '集', '铺垫', '兑现'],
+    beatCols: ['ID', '类型', 'Ontology', '量级', '集', '铺垫', '兑现'],
     weight: { major: '整体认知回报', minor: '局部认知回报' },
     rhythm: '叙事回报节奏',
     rhythmLegend: '■ major　□ minor　· 无回报',
@@ -845,13 +990,21 @@ const I18N = {
     epTitle: (n) => `第 ${n} 集`,
     epHook: '钩子',
     epSuspense: '悬念',
+    epPurpose: '本集目的',
+    audienceGain: '观众收获',
+    endingPull: '结尾牵引',
+    comicBeats: '荒诞 / 滑稽点',
+    productionRisk: 'AI 视频生产风险',
+    reuseClass: '资产复用等级',
     epScenes: '场景',
     epCast: '人物',
     epCrowd: '同框拆解',
     epWarnings: '预警',
     epsParen: (list) => `（第 ${list.join('、')} 集）`,
     epsCount: (n) => `${n} 集`,
-    sceneCols: ['ID', '场景', '主场景', '出现集', '次数', '复用方案'],
+    sceneCols: ['ID', '场景', '主场景', '复用等级', '出现集', '次数', '复用方案', '生产风险'],
+    canonCols: ['ID', '依赖摘要', '来源'],
+    historicalCols: ['ID', '类别', '主张', '状态', '故事影响'],
     propCols: ['ID', '道具', '承载什么', '出现集', '次数', '关联叙事回报'],
     castCols: ['ID', '角色', '定位', '出现集', '次数'],
     warnCols: ['难点', '涉及集'],
@@ -869,7 +1022,7 @@ const I18N = {
     kicker: 'Soviet Ghost narrative outline',
     docTitle: (s) => `${s} · Narrative Outline`,
     paramsLine: (p) =>
-      `${p.episodes} eps × ${p.minutesPerEpisode} min · ${p.genre} · ${p.adaptMode} adaptation`,
+      `${p.episodes} eps × ${p.minutesPerEpisode} min · ${p.genre}${p.adaptMode ? ` · ${p.adaptMode} adaptation` : ' · Original series'}`,
     exportJson: 'Export JSON',
     gates: 'Quality gates',
     gatesPass: 'All passed',
@@ -879,17 +1032,17 @@ const I18N = {
       decisions: 'Key decisions', rhythm: 'Narrative payoff rhythm', episodes: 'Per-episode synopses',
       episodesOverview: 'Episode overview', matrix: 'Dispatch matrix',
       sceneOverview: 'Scene overview', plan: 'Asset conversion', gates: 'Quality gates',
-      adaptation: 'Adaptation notes', characters: 'Cast table', beats: 'Narrative payoff table', assets: 'Asset list',
+      adaptation: 'Story design', canonRefs: 'Project Canon dependencies', characters: 'Cast table', beats: 'Narrative payoff table', assets: 'Asset list',
     },
     dec: {
-      cut: 'Which lines were cut', merge: 'Who got merged', majors: 'Where major payoffs land',
+      cut: 'Excluded elements', merge: 'Merged elements', majors: 'Major payoff placements',
       castSlots: (n, l, s, f) => `${n} cast slots (leads ${l} · supporting ${s} · functional ${f})`,
       leads: 'Leads', noCut: 'No lines cut (faithful adaptation)', noMajor: 'No major payoffs',
       first: 'First', final: 'Final',
     },
     secNotes: {
       decisions: 'The three sign-off items, on paper',
-      rhythm: (gap) => `gap ≤ ${gap} eps · no dead zones`,
+      rhythm: 'Payoff placements; no fixed frequency threshold',
       episodes: 'Core deliverable · three fields per episode',
       matrix: 'One column = who and where for that episode',
       sceneOverview: 'Top right = episodes present',
@@ -898,11 +1051,13 @@ const I18N = {
     },
     kpi: {
       episodes: 'Episodes', perEp: (m) => `× ${m} min`, runtime: (m) => `about ${m} min of footage`,
-      beats: 'Payoffs', beatsSub: (major, gap) => `${major} major${gap ? ` · max gap ${gap} eps` : ''}`,
+      beats: 'Payoffs', beatsSub: (major) => `${major} major`,
       cast: 'Cast', castSub: (l, s, f) => `leads ${l} · support ${s} · functional ${f}`,
       scenes: 'Primary scenes', scenesOnce: (n) => (n ? `${n} one-off, reuse plan required` : 'No one-off scenes'),
-      risks: 'Production risks', risksNone: 'Warning list empty',
-      mode: 'Adaptation mode', modeSub: (cut, merge) => `${cut} line(s) cut · ${merge} merge(s)`,
+      risks: 'High-risk episodes', risksNone: 'No high-risk episodes',
+      mode: 'Story source', modeSub: (source) => source,
+      comicSummary: (payoff, comic, both, high, core, recurring, episodeOnly) =>
+        `Episode value: ${payoff} payoff · ${comic} comicBeat · ${both} both · ${high} high-risk · scene reuse core ${core} / recurring ${recurring} / episode_only ${episodeOnly}`,
     },
     legendMajor: 'Major payoff', legendMinor: 'Minor payoff',
     gapNote: (n) => `— ${n}-ep gap —`,
@@ -910,7 +1065,7 @@ const I18N = {
     showAllEps: (n) => `Show all ${n} episodes`,
     assetsAuto: ' (auto-aggregated from episode data)',
     core: 'One-line core',
-    keep: 'Keep', cut: 'Cut', merge: 'Merge', risks: 'Risks & plans',
+    keep: 'Include', cut: 'Exclude', merge: 'Merge', risks: 'Risks & handling',
     what: 'What', why: 'Why', plan: 'Plan', evidence: 'Evidence',
     charCols: ['ID', 'Name', 'Tier', 'Role', 'Arc', '← Change record'],
     tier: { lead: 'Lead', support: 'Named supporting', functional: 'Functional' },
@@ -928,7 +1083,7 @@ const I18N = {
     planPropSpec: 'One white-plate sheet plus state variants each; must stay identical across episodes',
     planRiskRow: 'Production risks',
     planRiskSpec: 'Walk the warning list before generation',
-    beatCols: ['ID', 'Type', 'Level', 'Ep', 'Setup', 'Payoff'],
+    beatCols: ['ID', 'Type', 'Ontologies', 'Level', 'Ep', 'Setup', 'Payoff'],
     weight: { major: 'Major', minor: 'Minor' },
     rhythm: 'Narrative payoff rhythm',
     rhythmLegend: '■ major　□ minor　· none',
@@ -946,13 +1101,21 @@ const I18N = {
     epTitle: (n) => `Episode ${n}`,
     epHook: 'Hook',
     epSuspense: 'Suspense',
+    epPurpose: 'Episode purpose',
+    audienceGain: 'Audience gain',
+    endingPull: 'Ending pull',
+    comicBeats: 'Comic beats',
+    productionRisk: 'AI video production risk',
+    reuseClass: 'Asset reuse class',
     epScenes: 'Scenes',
     epCast: 'Cast',
     epCrowd: 'Crowd plan',
     epWarnings: 'Warnings',
     epsParen: (list) => ` (ep ${list.join(', ')})`,
     epsCount: (n) => `${n} eps`,
-    sceneCols: ['ID', 'Scene', 'Primary', 'Episodes', 'Uses', 'Reuse plan'],
+    sceneCols: ['ID', 'Scene', 'Primary', 'Reuse class', 'Episodes', 'Uses', 'Reuse plan', 'Production risk'],
+    canonCols: ['ID', 'Dependency summary', 'Source'],
+    historicalCols: ['ID', 'Category', 'Claim', 'Status', 'Story impact'],
     propCols: ['ID', 'Prop', 'What it carries', 'Episodes', 'Uses', 'Payoffs'],
     castCols: ['ID', 'Name', 'Role', 'Episodes', 'Uses'],
     warnCols: ['Risk', 'Episodes'],
@@ -990,7 +1153,8 @@ const byTier = (characters) =>
   [...characters].sort((a, b) => CHARACTER_TIERS.indexOf(a.tier) - CHARACTER_TIERS.indexOf(b.tier));
 
 export function renderMarkdown(outline, lang) {
-  const { source, params, adaptation: ad, characters, episodes } = outline;
+  const { source, params, characters, episodes } = outline;
+  const ad = storyDesignOf(outline);
   const beats = payoffsOf(outline);
   const t = tOf(lang ?? outline?.lang);
   const assets = computeAssets(outline);
@@ -1011,10 +1175,22 @@ export function renderMarkdown(outline, lang) {
     for (const r of rows) out.push(mdRow(fields.map((f) => r[f] ?? '')));
     out.push('');
   };
-  adTable(t.keep, ad.keep, ['what', 'why', 'evidence'], [t.what, t.why, t.evidence]);
-  adTable(t.cut, ad.cut, ['what', 'why'], [t.what, t.why]);
+  if (Array.isArray(outline.canonRefs) && outline.canonRefs.length) {
+    out.push(`### ${t.sections.canonRefs}`, '', mdHead(t.canonCols));
+    for (const ref of outline.canonRefs) out.push(mdRow([ref.id, ref.summary, ref.source]));
+    out.push('');
+  }
+  adTable(t.keep, ad.include ?? ad.keep, ['what', 'why', 'evidence'], [t.what, t.why, t.evidence]);
+  adTable(t.cut, ad.exclude ?? ad.cut, ['what', 'why'], [t.what, t.why]);
   adTable(t.merge, ad.merge, ['what', 'why'], [t.what, t.why]);
-  adTable(t.risks, ad.risks, ['what', 'plan'], [t.what, t.plan]);
+  adTable(t.risks, ad.risks, ['what', 'why'], [t.what, t.why]);
+  if (Array.isArray(outline.historicalResearch) && outline.historicalResearch.length) {
+    out.push(`### ${t.langCode === 'en' ? 'Historical research' : '历史研究'}`, '', mdHead(t.historicalCols));
+    for (const item of outline.historicalResearch) {
+      out.push(mdRow([item.id, item.category ?? 'legacy', item.claim, item.status, item.storyImpact ?? '']));
+    }
+    out.push('');
+  }
 
   out.push(`## ${t.mdSec(2, t.sections.characters)}`, '', mdHead(t.charCols));
   for (const c of byTier(characters)) {
@@ -1024,15 +1200,23 @@ export function renderMarkdown(outline, lang) {
 
   out.push(`## ${t.mdSec(3, t.sections.beats)}`, '', mdHead(t.beatCols));
   for (const b of beats) {
-    out.push(mdRow([b.id, payoffTypeLabel(b), t.weight[payoffLevel(b)], b.episode, b.setup, b.payoff]));
+    out.push(mdRow([b.id, payoffTypeLabel(b), payoffOntologies(b).join(t.sep), t.weight[payoffLevel(b)], b.episode, b.setup, b.payoff]));
   }
   out.push('');
 
   out.push(`## ${t.mdSec(4, t.sections.episodes)}`, '');
   for (const e of episodes) {
     out.push(`### ${t.epTitle(e.ep)}`, '', e.synopsis, '');
-    out.push(`- **${t.brk(t.epHook)}** ${e.hook}`);
-    out.push(`- **${t.brk(t.epSuspense)}** ${e.suspense}`);
+    if (e.episodePurpose?.length) out.push(`- **${t.epPurpose}** ${e.episodePurpose.join(t.sep)}`);
+    if (e.audienceGain) out.push(`- **${t.audienceGain}** ${e.audienceGain.newUnderstanding}；${e.audienceGain.storyProgress}`);
+    if (e.endingPull) out.push(`- **${t.endingPull}** ${e.endingPull.kind}${e.endingPull.content ? `：${e.endingPull.content}` : ''}`);
+    else {
+      if (e.hook) out.push(`- **${t.brk(t.epHook)}** ${e.hook}`);
+      if (e.suspense) out.push(`- **${t.brk(t.epSuspense)}** ${e.suspense}`);
+    }
+    if (e.comicBeats?.length) out.push(`- **${t.comicBeats}** ${e.comicBeats.map((beat) => `${beat.kind}：${beat.beat}（${beat.function}）`).join(t.sep)}`);
+    if (e.productionRisk) out.push(`- **${t.productionRisk}** ${e.productionRisk.level}：${e.productionRisk.reasons.join(t.sep)}`);
+    if (e.payoffs?.length) out.push(`- **${t.sections.beats}** ${e.payoffs.join(t.sep)}`);
     out.push(`- ${t.epScenes}${t.colon}${e.sceneIds.join(t.sep)}${t.pairSep}${t.epCast}${t.colon}${e.characterIds.join(t.sep)}`);
     if (e.crowdPlan) out.push(`- ${t.epCrowd}${t.colon}${e.crowdPlan}`);
     if (e.warnings?.length) out.push(`- ⚠️ ${t.epWarnings}${t.colon}${e.warnings.join(t.sep)}`);
@@ -1042,7 +1226,10 @@ export function renderMarkdown(outline, lang) {
   out.push(`## ${t.mdSec(5, t.sections.assets)}${t.assetsAuto}`, '');
   out.push(mdHead(t.sceneCols));
   for (const s of assets.scenes) {
-    out.push(mdRow([s.id, s.name, s.primary ? t.yes : t.no, s.episodes.join(t.sep), s.uses, s.reusePlan ?? '—']));
+    out.push(mdRow([
+      s.id, s.name, s.primary ? t.yes : t.no, s.reuseClass ?? '—', s.episodes.join(t.sep), s.uses,
+      s.reusePlan ?? '—', s.productionRisk ? `${s.productionRisk.level}: ${s.productionRisk.reasons.join(t.sep)}` : '—',
+    ]));
   }
   // 道具表：没有 props 的旧大纲不出这张表，不留一张空表占位
   if (assets.props.length) {
@@ -1078,9 +1265,9 @@ export function renderMarkdown(outline, lang) {
  * 业内评审用的单页报告：1600 宽，全部平铺可 Cmd+F。设计约定见
  * references/report-style.md。区块顺序按「先交付后存档」排：
  *   KPI 带 → 叙事回报节奏（时间轴）→ 分集梗概 → 调度矩阵 + 场景概览
- *   → 资产量折算 → 人物表 → 改编说明 → 质量门
+ *   → 资产量折算 → 人物表 → 故事设计与项目依赖 → 质量门
  * 所有图形都是内联 SVG/CSS —— 不引任何库，报告离线双击能开。
- * 配色跑过 dataviz 验证器：大爆点 #8a3324 / 常规 #c56a4e，六项全过。
+ * 配色跑过 dataviz 验证器：major payoff #8a3324 / minor payoff #c56a4e，六项全过。
  */
 
 /** 报告里内嵌的数据就是 outline.json 原样——编辑完能直接喂回 render。 */
@@ -1123,7 +1310,6 @@ const RH = { W: 1520, PADX: 30, ROWH: 176, AXIS: 92, PER_ROW: 20 };
 function renderRhythm(outline, t) {
   const total = outline.params.episodes;
   const beats = [...payoffsOf(outline)].sort((a, b) => a.episode - b.episode);
-  const th = thresholdsOf(outline);
   const cols = Math.min(total, RH.PER_ROW);
   const colW = (RH.W - 2 * RH.PADX) / cols;
   const rows = Math.ceil(total / cols);
@@ -1147,15 +1333,14 @@ function renderRhythm(outline, t) {
     }
   }
 
-  // 空档标注：同一行内、间距够宽才画；超阈值的标成铁锈红
+  // 空档仅作为 payoff 分布信息展示，不再作为连续性质量门。
   const beatEps = [...new Set(beats.map((b) => b.episode))].sort((a, b) => a - b);
   for (let i = 1; i < beatEps.length; i++) {
     const [e1, e2] = [beatEps[i - 1], beatEps[i]];
     const gap = e2 - e1 - 1;
     if (gap < 1 || rowOf(e1) !== rowOf(e2) || (e2 - e1) * colW < 120) continue;
-    const bad = e2 - e1 > th.maxPayoffGap;
     const mx = r1((Number(x(e1)) + Number(x(e2))) / 2);
-    parts.push(`<text class="gapnote${bad ? ' bad' : ''}" x="${mx}" y="${axisY(e1) - 12}" text-anchor="middle">${esc(t.gapNote(gap))}</text>`);
+    parts.push(`<text class="gapnote" x="${mx}" y="${axisY(e1) - 12}" text-anchor="middle">${esc(t.gapNote(gap))}</text>`);
   }
 
   // 节点：标签上下交替；同一集多个回报时后来的翻到对面
@@ -1200,7 +1385,8 @@ const htable = (cols, rows) =>
 <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n')}</tbody></table>`;
 
 export function renderHtml(outline, lang) {
-  const { source, params, adaptation: ad, characters, episodes } = outline;
+  const { source, params, characters, episodes } = outline;
+  const ad = storyDesignOf(outline);
   const beats = payoffsOf(outline);
   const t = tOf(lang ?? outline?.lang);
   const assets = computeAssets(outline);
@@ -1211,36 +1397,65 @@ export function renderHtml(outline, lang) {
 
   // ---- KPI 带 ----
   const beatEps = [...new Set(beats.map((b) => b.episode))].sort((a, b) => a - b);
-  let maxGap = 0;
-  for (let i = 1; i < beatEps.length; i++) maxGap = Math.max(maxGap, beatEps[i] - beatEps[i - 1]);
   const tierN = Object.fromEntries(assets.castPlan.map((p) => [p.tier, p.count]));
   const primaryScenes = assets.scenes.filter((s) => s.primary);
   const onceScenes = assets.scenes.filter((s) => s.uses === 1);
-  const riskTotal = Object.values(assets.warnings).reduce((n, e) => n + e.length, 0);
-  const riskSub = Object.entries(assets.warnings)
-    .map(([w, e]) => `${w} ×${e.length}${t.epsParen(e)}`)
-    .join(' · ');
+  const highRiskEpisodes = episodes.filter((episode) => episode.productionRisk?.level === 'high').length;
+  const legacyRiskTotal = Object.values(assets.warnings).reduce((n, epsIn) => n + epsIn.length, 0);
+  const riskTotal = highRiskEpisodes + legacyRiskTotal;
+  const riskSub = [
+    ...Object.entries(assets.warnings).map(([risk, epsIn]) => `${risk} ×${epsIn.length}${t.epsParen(epsIn)}`),
+    ...episodes
+    .filter((episode) => episode.productionRisk)
+      .map((episode) => `${episode.ep}:${episode.productionRisk.level}`),
+  ].join(' · ');
   const majors = beats.filter((b) => payoffLevel(b) === 'major').length;
+  const sourceLabel = outline.sourceAdaptation?.mode ?? (params.adaptMode ?? (lang === 'en' ? 'Original' : '原创'));
+  const comicEpisodeCount = episodes.filter((episode) => episodeHasComicBeat(episode)).length;
+  const payoffEpisodeCount = episodes.filter((episode) => (episode.payoffs ?? []).length > 0).length;
+  const bothEpisodeCount = episodes.filter((episode) => (episode.payoffs ?? []).length > 0 && episodeHasComicBeat(episode)).length;
+  const highRiskEpisodeCount = episodes.filter((episode) => episode.productionRisk?.level === 'high').length;
+  const reuseCounts = Object.fromEntries(['core', 'recurring', 'episode_only'].map((reuseClass) =>
+    [reuseClass, assets.scenes.filter((scene) => scene.reuseClass === reuseClass).length],
+  ));
 
   const kpis = `<div class="kpis">
   <div class="kpi accent"><div class="l">${esc(t.kpi.episodes)}</div><div class="v">${total} <small>${esc(t.kpi.perEp(params.minutesPerEpisode))}</small></div><div class="d">${esc(t.kpi.runtime(total * params.minutesPerEpisode))}</div></div>
-  <div class="kpi"><div class="l">${esc(t.kpi.beats)}</div><div class="v">${beats.length}</div><div class="d">${esc(t.kpi.beatsSub(majors, maxGap))}</div></div>
+  <div class="kpi"><div class="l">${esc(t.kpi.beats)}</div><div class="v">${beats.length}</div><div class="d">${esc(t.kpi.beatsSub(majors))}</div></div>
   <div class="kpi"><div class="l">${esc(t.kpi.cast)}</div><div class="v">${characters.length}</div><div class="d">${esc(t.kpi.castSub(tierN.lead ?? 0, tierN.support ?? 0, tierN.functional ?? 0))}</div></div>
   <div class="kpi"><div class="l">${esc(t.kpi.scenes)}</div><div class="v">${primaryScenes.length}${assets.scenes.length > primaryScenes.length ? ` <small>+${assets.scenes.length - primaryScenes.length}</small>` : ''}</div><div class="d">${esc(t.kpi.scenesOnce(onceScenes.length))}</div></div>
   <div class="kpi"><div class="l">${esc(t.kpi.risks)}</div><div class="v">${riskTotal}</div><div class="d">${esc(riskTotal ? snip(riskSub, 24) : t.kpi.risksNone)}</div></div>
-  <div class="kpi"><div class="l">${esc(t.kpi.mode)}</div><div class="v mode">${esc(params.adaptMode)}</div><div class="d">${esc(t.kpi.modeSub(ad.cut.length, ad.merge.length))}</div></div>
-</div>`;
+  <div class="kpi"><div class="l">${esc(t.kpi.mode)}</div><div class="v mode">${esc(sourceLabel)}</div><div class="d">${esc(t.kpi.modeSub(outline.sourceAdaptation?.source ?? (lang === 'en' ? 'Project story design' : '项目原创故事设计')))}</div></div>
+</div>
+<p class="gsum">${esc(t.kpi.comicSummary(
+  payoffEpisodeCount, comicEpisodeCount, bothEpisodeCount, highRiskEpisodeCount,
+  reuseCounts.core, reuseCounts.recurring, reuseCounts.episode_only,
+))}</p>`;
 
   // ---- 分集卡 ----
   const epCards = episodes
     .map((e) => {
       const bs = beatsOf(e.ep);
+      const ending = e.endingPull
+        ? `${e.endingPull.kind}${e.endingPull.content ? `：${e.endingPull.content}` : ''}`
+        : [e.hook, e.suspense].filter(Boolean).join(' · ');
+      const comics = (e.comicBeats ?? []).map((beat) => `${beat.kind}：${beat.beat}（${beat.function}）`).join('；');
+      const purpose = (e.episodePurpose ?? []).join('、');
+      const gain = e.audienceGain
+        ? `${e.audienceGain.newUnderstanding}；${e.audienceGain.storyProgress}`
+        : '';
+      const productionRisk = e.productionRisk
+        ? `${e.productionRisk.level}：${e.productionRisk.reasons.join('、')}`
+        : '';
       return `<article class="ep" id="ep-${e.ep}">
   <span class="num">${e.ep}</span>
   <header><b>${esc(t.epTitle(e.ep))}</b>${bs.map((b) => `<i class="bt${payoffLevel(b) === 'major' ? ' major' : ''}">${esc(payoffTypeLabel(b))}</i>`).join('')}</header>
   <p class="syn">${esc(e.synopsis)}</p>
-  <div class="hk"><b>${esc(t.epHook)}</b><span>${esc(e.hook)}</span></div>
-  <div class="hk"><b>${esc(t.epSuspense)}</b><span>${esc(e.suspense)}</span></div>
+  ${purpose ? `<div class="hk"><b>${esc(t.epPurpose)}</b><span>${esc(purpose)}</span></div>` : ''}
+  ${gain ? `<div class="hk"><b>${esc(t.audienceGain)}</b><span>${esc(gain)}</span></div>` : ''}
+  ${ending ? `<div class="hk"><b>${esc(t.endingPull)}</b><span>${esc(ending)}</span></div>` : ''}
+  ${comics ? `<div class="hk"><b>${esc(t.comicBeats)}</b><span>${esc(comics)}</span></div>` : ''}
+  ${productionRisk ? `<div class="hk"><b>${esc(t.productionRisk)}</b><span>${esc(productionRisk)}</span></div>` : ''}
   <div class="meta">${e.sceneIds.map((id) => `<i>${esc(id)}</i>`).join('')}${e.characterIds.map((id) => `<i>${esc(id)}</i>`).join('')}${(e.warnings ?? []).map((w) => `<i class="warn">${esc(w)}</i>`).join('')}${e.crowdPlan ? `<i class="warn" title="${esc(e.crowdPlan)}">${esc(t.crowdOk)}</i>` : ''}</div>
 </article>`;
     })
@@ -1258,7 +1473,7 @@ export function renderHtml(outline, lang) {
     ...byTier(assets.characters).map((c) => mxRow(c.name, t.tier[c.tier] ?? c.tier, c.episodes, '', String(c.uses))),
     `<tr class="div"><td colspan="${total + 3}">${esc(t.matrixScenes)}</td></tr>`,
     ...assets.scenes.map((s) =>
-      mxRow(s.name, s.primary ? t.primaryScene : t.onceScene, s.episodes, ' sc', s.uses === 1 ? `${s.uses} ⚠` : String(s.uses)),
+      mxRow(s.name, `${s.reuseClass ? `${s.reuseClass} · ` : ''}${s.primary ? t.primaryScene : t.onceScene}`, s.episodes, ' sc', s.uses === 1 ? `${s.uses} ⚠` : String(s.uses)),
     ),
     // 道具段：没有 props 的旧大纲整段不出，不留一个空标题
     ...(assets.props.length
@@ -1300,9 +1515,10 @@ export function renderHtml(outline, lang) {
       const castIn = [...new Set(episodes.filter((e) => (e.sceneIds ?? []).includes(s.id)).flatMap((e) => e.characterIds ?? []))];
       return `<article class="scard">
   <span class="snum">${esc(fmtEps(s.episodes, t))}</span>
-  <h3><span class="id">${esc(s.id)}</span>${esc(s.name)}<span class="badge${s.primary ? '' : ' once'}">${esc(s.primary ? t.primaryScene : t.onceScene)}</span></h3>
+  <h3><span class="id">${esc(s.id)}</span>${esc(s.name)}<span class="badge${s.primary ? '' : ' once'}">${esc(s.reuseClass ?? (s.primary ? t.primaryScene : t.onceScene))}</span></h3>
   <div class="strip">${strip}</div>
   <div class="srow"><b>${esc(t.beatsCarried)}</b><span>${carried.length ? esc(carriedText) : esc(t.none)}</span></div>
+  ${s.productionRisk ? `<div class="srow"><b>${esc(t.productionRisk)}</b><span>${esc(`${s.productionRisk.level}：${s.productionRisk.reasons.join('、')}`)}</span></div>` : ''}
   ${s.reusePlan
     ? `<div class="srow"><b>${esc(t.reusePlanLabel)}</b><span class="reuse">${esc(s.reusePlan)}</span></div>`
     : `<div class="srow"><b>${esc(t.castSeen)}</b>${castIn.map((id) => `<i>${esc(id)}</i>`).join('')}</div>`}
@@ -1332,15 +1548,19 @@ export function renderHtml(outline, lang) {
     [esc(t.planRiskRow), String(riskTotal), esc(riskTotal ? riskSub : t.none), esc(t.planRiskSpec)],
   ];
 
-  // ---- 关键决策：拍板三件事，砍线/合人来自改编说明，大爆点与角色位算出来 ----
+  // ---- 关键决策：故事设计取舍、主要 payoff 分布与角色位 ----
   const majorBeats = beats.filter((b) => payoffLevel(b) === 'major').sort((a, b) => a.episode - b.episode);
   const leadNames = characters.filter((c) => c.tier === 'lead').map((c) => c.name);
   const decisions = `<div class="dec3">
   <div class="dcol">
-    <h3 class="sub">${esc(t.dec.cut)}</h3>
-    ${ad.cut.length
-      ? `<ul class="dlist">${ad.cut.map((r) => `<li><b>${esc(r.what)}</b><small>${esc(r.why)}</small></li>`).join('')}</ul>`
-      : `<p class="dnote">${esc(t.dec.noCut)}</p>`}
+    <h3 class="sub">${esc(t.keep)}</h3>
+    ${ad.include?.length
+      ? `<ul class="dlist">${ad.include.map((r) => `<li><b>${esc(r.what)}</b><small>${esc(r.why)}</small></li>`).join('')}</ul>`
+      : `<p class="dnote">${esc(t.none)}</p>`}
+    <h3 class="sub">${esc(t.cut)}</h3>
+    ${ad.exclude?.length
+      ? `<ul class="dlist">${ad.exclude.map((r) => `<li><b>${esc(r.what)}</b><small>${esc(r.why)}</small></li>`).join('')}</ul>`
+      : `<p class="dnote">${esc(t.none)}</p>`}
     ${ad.cutNote ? `<p class="dnote seal">${esc(ad.cutNote)}</p>` : ''}
   </div>
   <div class="dcol">
@@ -1485,7 +1705,6 @@ section{margin-top:34px}
 .rhythm .blabel{font:500 12px var(--sans);fill:var(--ink)}
 .rhythm .bsub{font:400 10.5px var(--sans);fill:var(--ink-2)}
 .rhythm .gapnote{font:400 10.5px var(--sans);fill:var(--ink-3)}
-.rhythm .gapnote.bad{fill:var(--seal);font-weight:500}
 
 /* beat detail table + generic tables */
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--rule);font-size:13px}
@@ -1608,7 +1827,7 @@ ${failed.length ? `<div class="galert"><b>✗ ${esc(t.gatesFail(failed.length))}
   </div>
   <div class="tabpane on" id="pane-timeline">${renderRhythm(outline, t)}</div>
   <div class="tabpane" id="pane-table">
-  ${htable(t.beatCols, beats.map((b) => [esc(b.id), esc(payoffTypeLabel(b)), esc(t.weight[payoffLevel(b)]), String(b.episode), esc(b.setup), esc(b.payoff)]))}
+  ${htable(t.beatCols, beats.map((b) => [esc(b.id), esc(payoffTypeLabel(b)), esc(payoffOntologies(b).join(t.sep)), esc(t.weight[payoffLevel(b)]), String(b.episode), esc(b.setup), esc(b.payoff)]))}
   </div>
 </section>
 
@@ -1654,10 +1873,17 @@ ${scards}
 <section id="sec-adaptation">
   ${secHead('08', t.sections.adaptation, t.secNotes.adaptation)}
   <p class="core">${esc(ad.core)}</p>
-  ${ad.keep?.length ? `<h3 class="sub">${esc(t.keep)}</h3>${htable([t.what, t.why, t.evidence], ad.keep.map((r) => [esc(r.what), esc(r.why), r.evidence ? `<q>${esc(r.evidence)}</q>` : esc(t.none)]))}` : ''}
-  ${ad.cut?.length ? `<h3 class="sub">${esc(t.cut)}</h3>${htable([t.what, t.why], ad.cut.map((r) => [esc(r.what), esc(r.why)]))}` : ''}
+  ${Array.isArray(outline.canonRefs) && outline.canonRefs.length ? `<h3 class="sub">${esc(t.sections.canonRefs)}</h3>${htable(t.canonCols, outline.canonRefs.map((ref) => [esc(ref.id), esc(ref.summary), esc(ref.source)]))}` : ''}
+  ${ad.include?.length ? `<h3 class="sub">${esc(t.keep)}</h3>${htable([t.what, t.why, t.evidence], ad.include.map((r) => [esc(r.what), esc(r.why), r.evidence ? `<q>${esc(r.evidence)}</q>` : esc(t.none)]))}` : ''}
+  ${ad.exclude?.length ? `<h3 class="sub">${esc(t.cut)}</h3>${htable([t.what, t.why], ad.exclude.map((r) => [esc(r.what), esc(r.why)]))}` : ''}
   ${ad.merge?.length ? `<h3 class="sub">${esc(t.merge)}</h3>${htable([t.what, t.why], ad.merge.map((r) => [esc(r.what), esc(r.why)]))}` : ''}
-  ${ad.risks?.length ? `<h3 class="sub">${esc(t.risks)}</h3>${htable([t.what, t.plan], ad.risks.map((r) => [esc(r.what), esc(r.plan)]))}` : ''}
+  ${ad.risks?.length ? `<h3 class="sub">${esc(t.risks)}</h3>${htable([t.what, t.why], ad.risks.map((r) => [esc(r.what), esc(r.why ?? r.plan)]))}` : ''}
+  ${Array.isArray(outline.historicalResearch) && outline.historicalResearch.length
+    ? `<h3 class="sub">${esc(t.langCode === 'en' ? 'Historical research' : '历史研究')}</h3>${htable(
+      t.historicalCols,
+      outline.historicalResearch.map((item) => [esc(item.id), esc(item.category ?? 'legacy'), esc(item.claim), esc(item.status), esc(item.storyImpact ?? '')]),
+    )}`
+    : ''}
 </section>
 
 <section id="sec-gates">

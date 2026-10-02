@@ -1,48 +1,52 @@
-# 骨架设计 · 改编、人物、场景与叙事回报
+# 故事骨架 · 项目 Canon、人物、场景与叙事回报
 
-根据全部分卷摘要（或短篇原文）和用户参数，起草大纲骨架：`adaptation`、`characters`、`scenes`、`payoffs`、`historicalResearch`。在骨架和 payoff 通过确认门之前，不得写分集梗概。
+根据用户提供的故事素材、已确认的项目 Canon 与目标参数，先起草故事设计骨架。骨架至少包含 `storyDesign`、`canonRefs`、`characters`、`scenes`、`props`、`payoffs`、`historicalResearch`。此阶段不写分集。
 
 ## 执行顺序
 
-1. **改编取舍。**明确主冲突；每条保留、删减和合并都写明理由。依赖原文的决定应附逐字依据。
-2. **人物。**合并功能重复的角色，在 `characters[].from` 记录来源，再按现有 `lead` / `support` / `functional` 分档。功能性角色可以没有人物弧。
-3. **场景。**遵守随集数变化的主场景上限。只出现一次的场景必须填写 `reusePlan`。
-4. **叙事回报候选。**定义观众将获得什么认知或情绪回报，而非制造什么奇观或胜利。填写固定 taxonomy 类型、`level`、ontology、setup、payoff、theme、tone、落点集数与风险。确认它不是单纯的 hook 或 cliffhanger。
-5. **道具。**沿用原有叙事道具规则；`beatIds` 填写对应 payoff 的 ID。待 payoff 与场景需求稳定后，再把道具引用写进分集。
-
-所有判断必须依据用户提供的文本或用户确认的 canon。不得凭书名虚构原文内容，也不得凭模型记忆填补历史空白。
+1. **故事设计。**明确 `storyDesign.core`，并分别列出 `include`、`exclude`、`merge`、`risks`，条目格式为 `{what, why}`。不要求 exclude 非空。仅有明确文本来源时才填写可选 `sourceAdaptation`。
+2. **Canon 依赖。**只记录当前故事依赖的项目级事实到 `canonRefs`（`id`、简述、来源）。Canon 是外部事实源；不可在 outline 中复制完整世界观、重新定义或擅自升级未确认信息。
+3. **人物。**合并功能重复的角色，再按 `lead` / `support` / `functional` 分档。人物来源可来自素材、用户设定、Canon 或原创；不得为了保留旧改编字段而虚构原著对应角色。
+4. **场景与资产。**主场景上限随集数计算。为新场景标明 `reuseClass`：`core`、`recurring` 或 `episode_only`；一次性 `episode_only` 场景要有 `reusePlan`。预判 AI 视频生成风险，只填写 `productionRisk`，不设计镜头。
+5. **payoff 候选。**明确认知层级、setup、因果发展、payoff/result、theme、tone、落点与风险。允许 `type` 和 `ontologies` 多选；仍只能用既有十种 type 与 A/B ontology。
+6. **历史研究问题。**对照 `historical-research.md`，只登记会影响故事决策的事实与可行性问题。纯架空制度设计不建立强制暂停。
 
 ## 必须暂停：payoff 候选确认
 
-逐项呈现候选，供用户审阅：
+逐项展示 payoff 候选，等待用户明确确认：
 
 ```text
 ### 第 01 集 · P001
-类型：
-层级：
-Ontology：
+Type（可多选）：
+Level：
+Ontologies（可多选）：
 Setup：
-Payoff：
+因果发展：
+Payoff / result：
 主题作用：
-风险与克制处理建议：
+调性处理与风险：
 状态：proposed
 [STOP — PAYOFF CONFIRMATION REQUIRED]
 ```
 
-未获用户批准前，不得新增或删除 payoff，不得移动落点、改变 level 或 type，也不得改变核心含义。等待用户明确逐项批准或修改。只有得到批准后，才能将 `status` 设为 `confirmed`、将 `userConfirmed` 设为 `true`。若用户要求修改，状态应回到 `revised` / 未确认，待再次批准。
+只有获得明确批准后，才能设置 `status: "confirmed"`、`userConfirmed: true`。未经批准不得新增、删除、移动 payoff，也不得更改其 level、type 或核心含义。Comic beat 在分集写作阶段形成，不需要逐项确认，也不得包装成新的 payoff。
 
-只能使用 `payoff-taxonomy.md` 中的十种类型。若没有合适类型，解释现有 taxonomy 的不足并暂停，等待用户确认后再添加。
+## 骨架评审内容
 
-## 历史研究暂停点
+向用户展示：
 
-若候选依赖尚未纳入用户确认 canon 的真实历史事实，停止并遵循 `historical-research.md`。将问题记为 `RESEARCH_REQUIRED`；用户解决之前，不得继续依赖该事实发展剧情。
+- 故事核心及 include / exclude / merge 设计；
+- 本故事依赖的 Canon refs；
+- 角色分档、人物关系与角色来源；
+- core / recurring / episode_only 场景及复用规划；
+- payoff 候选与确认状态；
+- 历史研究问题及其故事影响；
+- 初步 AI 视频生产风险。
 
-## 骨架拍板
-
-payoff 获得明确确认、必要的历史问题得到解决后，运行：
+骨架通过 `validate --stage skeleton` 后展示给用户拍板。Payoff 逐项确认及必要历史决策完成后运行：
 
 ```bash
 node scripts/soviet-ghost-outline.mjs validate <outline.json> --stage beats
 ```
 
-随后把改编取舍、合并人物和 payoff 落点交给用户拍板。用户未确认骨架前不得开始写分集。
+未获用户确认的 payoff 不得进入正式分集。用户未确认骨架前不得开始分集写作。

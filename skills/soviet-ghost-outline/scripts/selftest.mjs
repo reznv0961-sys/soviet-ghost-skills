@@ -43,6 +43,32 @@ function eq(actual, expected, msg) {
 }
 const clone = () => JSON.parse(JSON.stringify(FIXTURE));
 const gate = (o, id) => gateReport(o).find((g) => g.id === id);
+const v11 = () => {
+  const o = JSON.parse(JSON.stringify(EP01_FIXTURE));
+  o.storyDesign = { core: '独立成立、弱连续推进', include: [], exclude: [], merge: [], risks: [] };
+  delete o.adaptation;
+  delete o.params.adaptMode;
+  o.canonRefs = [];
+  for (const scene of o.scenes) scene.reuseClass = 'core';
+  for (const payoff of o.payoffs) {
+    payoff.ontologies = [payoff.ontology];
+    delete payoff.ontology;
+  }
+  for (const item of o.historicalResearch) {
+    item.category = 'historical_fact';
+    item.storyImpact = '已确认前提，不改变本集剧情';
+  }
+  for (const episode of o.episodes) {
+    episode.episodePurpose = ['world_reveal'];
+    episode.audienceGain = { newUnderstanding: '理解一项规则', storyProgress: '推进世界认知' };
+    episode.endingPull = { kind: 'none', content: '' };
+    episode.productionRisk = { level: 'low', reasons: [] };
+    episode.comicBeats = [];
+    delete episode.hook;
+    delete episode.suspense;
+  }
+  return o;
+};
 
 /* ---------------- chunk ---------------- */
 
@@ -96,10 +122,117 @@ for (const type of ['bureaucratic_absurdity', 'historical_dislocation', 'dry_com
   eq(validateOutline(o, 'beats').length, 0, `合法 payoff type ${type} 通过 beats 校验`);
 }
 {
+  const o = v11();
+  o.episodes[0].comicBeats = [];
+  ok(gate(o, 'episode-value').ok, '只有 payoff 的单集通过 episode-value');
+  o.episodes[0].comicBeats = [{
+    kind: 'bureaucratic_detail', beat: '工作人员整理一张多余表格', function: '形成程序性荒诞',
+  }];
+  ok(gate(o, 'episode-value').ok, 'payoff 与 comicBeat 并存通过 episode-value');
+}
+{
+  const o = v11();
+  o.payoffs = o.payoffs.filter((payoff) => payoff.id !== 'P001');
+  o.episodes[0].payoffs = [];
+  o.episodes[0].comicBeats = [{
+    kind: 'dry_capper', beat: '窗口工作人员将地图收进档案夹', function: '用克制动作收尾',
+  }];
+  eq(validateOutline(o).length, 0, '没有 payoff、有 comicBeat 的原创单集通过 full');
+  o.episodes[0].comicBeats = [];
+  ok(!gate(o, 'episode-value').ok, '没有 payoff、也没有 comicBeat 的单集失败');
+  ok(gate(o, 'episode-value').detail.includes('第 01 集'), 'episode-value 中文诊断点名集数');
+}
+{
+  const o = v11();
+  o.payoffs = [];
+  for (const episode of o.episodes) {
+    episode.payoffs = [];
+    episode.comicBeats = [{
+      kind: 'procedural_gag', beat: '工作人员把空白表格放入已完成档案', function: '呈现程序的自我循环',
+    }];
+  }
+  eq(validateOutline(o, 'beats').length, 0, '全局 payoffs 为空时 beats stage 允许 comicBeat 驱动的大纲');
+  eq(validateOutline(o, 'full').length, 0, '每集都有有效 comicBeat 时全局 payoffs 可为空');
+}
+{
+  const o = v11();
+  o.payoffs[0].type = ['historical_dislocation', 'identity_conflict'];
+  o.payoffs[0].ontologies = ['historical_dislocation_A', 'identity_conflict_B'];
+  eq(validateOutline(o, 'beats').length, 0, 'payoff 多 type 与多 ontologies 通过');
+  o.payoffs[0].ontologies = ['unknown_ontology'];
+  ok(!gate(o, 'payoff-types').ok, 'unknown ontology 被 gate 拦截');
+  ok(validateOutline(o, 'beats').some((problem) => problem.includes('ontologies')), 'unknown ontology 有结构诊断');
+}
+{
+  const o = v11();
+  o.historicalResearch = [{
+    id: 'HR-FICTION', category: 'fictional_institution_design', claim: '死亡证明有几联',
+    status: 'RESEARCH_REQUIRED', storyImpact: '决定表格结构',
+  }];
+  eq(validateOutline(o).length, 0, 'fictional_institution_design 本身不阻止 full');
+  o.historicalResearch[0] = {
+    id: 'HR-FACT', category: 'historical_fact', claim: '真实机构负责某项事务',
+    status: 'RESEARCH_REQUIRED', storyImpact: '会改变机构权力边界',
+  };
+  ok(!gate(o, 'historical-research').ok, '未解决 historical_fact 阻止 full');
+}
+{
+  const o = clone();
+  o.scenes[2].reuseClass = 'episode_only';
+  const reusePlan = o.scenes[2].reusePlan;
+  delete o.scenes[2].reusePlan;
+  ok(!gate(o, 'once-scene').ok, 'episode_only 一次性场景缺复用方案失败');
+  o.scenes[2].reusePlan = reusePlan;
+  o.episodes[0].productionRisk = { level: 'high', reasons: ['vehicle_motion'] };
+  eq(validateOutline(o).length, 0, '合法 productionRisk 结构通过');
+  o.episodes[0].productionRisk.level = 'severe';
+  ok(!gate(o, 'production-risk').ok, '无效 productionRisk level 被拦截');
+  o.episodes[0].productionRisk = { level: 'low', reasons: 'weather' };
+  ok(!gate(o, 'production-risk').ok, 'productionRisk reasons 必须是数组');
+  o.episodes[0].productionRisk = { level: 'low', reasons: [] };
+  o.storyDesign = { core: '原创', include: [], exclude: [], merge: [], risks: [] };
+  for (const scene of o.scenes) scene.reuseClass = 'recurring';
+  o.scenes[0].reuseClass = 'one_time';
+  ok(validateOutline(o, 'skeleton').some((problem) => problem.includes('reuseClass')), '无效 reuseClass 被校验器拦截');
+  o.scenes[0].reuseClass = 'core';
+  o.canonRefs = [{ id: 'CANON-01', summary: '规则摘要' }];
+  ok(validateOutline(o, 'skeleton').some((problem) => problem.includes('source')), 'Canon refs 缺 source 被校验器拦截');
+}
+{
+  const o = v11();
+  delete o.episodes[0].productionRisk;
+  ok(!gate(o, 'production-risk').ok, '新版 episode 必须声明 productionRisk');
+  ok(validateOutline(o).some((problem) => problem.includes('缺 productionRisk')), '缺 productionRisk 有明确校验错误');
+  ok(validateOutline(EP01_FIXTURE).length === 0, 'legacy episode 缺 productionRisk 仍兼容');
+}
+{
+  const legacy = JSON.parse(JSON.stringify(EP01_FIXTURE));
+  ok(!validateOutline(legacy).length, '旧 ontology 与 hook/suspense JSON 可兼容校验');
+  ok(renderMarkdown(legacy).includes('钩子'), '旧 hook 字段可渲染');
+  ok(renderHtml(legacy).includes('登记系统是否允许填写一个未列出的历史身份？'), '旧 suspense 字段内容可渲染且不崩溃');
+}
+{
+  const o = v11();
+  o.canonRefs = [{ id: 'CANON-01', summary: '亡灵必须经过行政登记', source: '项目世界观文档' }];
+  o.scenes[0].productionRisk = { level: 'medium', reasons: ['text_or_map'] };
+  o.episodes[0].comicBeats = [{
+    kind: 'dry_capper', beat: '工作人员郑重地收起地图', function: '克制收束身份错位',
+  }];
+  o.episodes[0].productionRisk = { level: 'high', reasons: ['text_or_map'] };
+  const mdV11 = renderMarkdown(o);
+  const htmlV11 = renderHtml(o);
+  ok(mdV11.includes('CANON-01') && htmlV11.includes('项目世界观文档'), '报告显示故事依赖的 Canon refs');
+  ok(mdV11.includes('本集目的') && htmlV11.includes('本集目的'), '报告显示新版单集目的');
+  ok(mdV11.includes('dry_capper') && htmlV11.includes('dry_capper'), '报告显示 comicBeat');
+  ok(mdV11.includes('text_or_map') && htmlV11.includes('text_or_map'), '报告显示 AI 视频生产风险');
+  ok(mdV11.includes('historical_fact') && htmlV11.includes('historical_fact'), '报告显示历史研究类别');
+  ok(htmlV11.includes('core'), '场景报告显示 reuseClass');
+}
+{
   const o = JSON.parse(JSON.stringify(EP01_FIXTURE));
   o.params.thresholds.maxPayoffGap = 1;
   o.payoffs = o.payoffs.filter((payoff) => payoff.id !== 'P002');
-  ok(!gate(o, 'payoff-gap').ok, 'maxPayoffGap 可配置并拦截过长间隔');
+  ok(!gate(o, 'payoff-gap'), 'maxPayoffGap 不再作为质量门');
 }
 
 {
@@ -117,16 +250,25 @@ for (const type of ['bureaucratic_absurdity', 'historical_dislocation', 'dry_com
 }
 {
   const o = JSON.parse(JSON.stringify(EP01_FIXTURE));
-  o.historicalResearch.push({ id: 'HR-TEST', claim: '未核实的历史制度', status: 'RESEARCH_REQUIRED' });
+  o.historicalResearch.push({
+    id: 'HR-TEST', category: 'historical_fact', claim: '未核实的历史制度',
+    status: 'RESEARCH_REQUIRED', storyImpact: '会改变机构权限设定',
+  });
   eq(validateOutline(o, 'beats').length, 0, '历史研究暂停点不改变已确认 beats 的校验');
   ok(!gate(o, 'historical-research').ok, '未解决历史研究被质量门标记');
-  ok(validateOutline(o, 'full').some((x) => x.includes('历史研究问题已解决')), '未解决历史研究阻止 full stage');
+  ok(validateOutline(o, 'full').some((x) => x.includes('历史事实依赖')), '未解决历史研究阻止 full stage');
 }
 {
   const o = JSON.parse(JSON.stringify(EP01_FIXTURE));
-  o.episodes[0].payoffs = [];
-  o.episodes[0].payoffRationale = '';
-  ok(validateOutline(o).some((x) => x.includes('payoffRationale')), 'hook 不能代替 payoff 或无 payoff 的理由');
+  o.episodes[1].payoffRationale = '';
+  ok(validateOutline(o).length === 0, '有效 comicBeat 可替代 payoff，无需 payoffRationale');
+}
+{
+  const o = JSON.parse(JSON.stringify(EP01_FIXTURE));
+  delete o.episodes[0].payoffs;
+  const problems = validateOutline(o);
+  ok(problems.some((problem) => problem.includes('缺 payoffs 数组')), '缺少 payoffs 数组时给出字段错误');
+  ok(problems.every((problem) => !problem.includes('payoffRationale')), 'payoffs 缺失错误不再要求 payoffRationale');
 }
 {
   const o = JSON.parse(JSON.stringify(EP01_FIXTURE));
@@ -171,7 +313,7 @@ for (const type of ['bureaucratic_absurdity', 'historical_dislocation', 'dry_com
   ok(!gate(b, 'refs').ok, '零集使用的道具被拦下——跟失业角色同一个判据');
   ok(gate(b, 'refs').detail.includes('P03'), '点名是哪件道具');
 
-  // --- 击穿：beatIds 指向不存在的爽点 ---
+  // --- 检查：beatIds 指向不存在的 payoff ---
   const c = clone(); c.props[0].beatIds = ['B99'];
   ok(!gate(c, 'refs').ok, 'beatIds 指错被拦下——指错等于这件道具没有戏剧理由');
 
@@ -297,54 +439,32 @@ eq(primarySceneCap(undefined), 8, '没有集数信息给居中值 8');
   ok(gate(o, 'once-scene').detail.includes('芦苇'), '报错点名是哪个场景');
 }
 
-// G4 爽点间隔
+// 旧分布间隔 / cliffhanger / major 时机不再作为硬门
 {
   const o = clone();
   o.payoffs = o.payoffs.filter((b) => b.id !== 'P002'); // 1 → 5 之间断档
-  ok(!gate(o, 'payoff-gap').ok, '第 1–5 集断档被拦');
-  ok(gate(o, 'payoff-gap').detail.includes('断档'), '报的是断档');
-}
-{
-  const o = clone();
-  o.payoffs.forEach((b) => (b.episode = Math.min(b.episode + 3, 6)));
-  o.payoffs[0].episode = 4; // 开头真空
-  ok(!gate(o, 'payoff-gap').ok, '开头 3 集真空被拦');
-}
-{
-  const o = clone();
-  o.payoffs = o.payoffs.filter((b) => b.episode <= 3);
-  ok(!gate(o, 'payoff-gap').ok, '结尾真空被拦');
-  // beats 档就要拦住间隔问题，不能等写完分集才发现
-  ok(validateOutline(o, 'beats').some((x) => x.includes('叙事回报间隔')), 'beats 档就报间隔');
+  ok(!gate(o, 'payoff-gap'), '删除旧 payoff 后不再触发间隔门');
+  ok(validateOutline(o, 'beats').every((x) => !x.includes('叙事回报间隔')), 'beats 档不再检查 payoff 间隔');
 }
 
-// G5 第 1 集钩子
+// 单集可用 none 自然结束，不要求 cliffhanger
 {
   const o = clone();
-  o.episodes[0].hook = ' ';
-  ok(!gate(o, 'ep1-hook').ok, '第 1 集没钩子被拦');
+  o.episodes[0].endingPull = { kind: 'none', content: '' };
+  delete o.episodes[0].hook;
+  delete o.episodes[0].suspense;
+  o.episodes[0].episodePurpose = ['world_reveal'];
+  o.episodes[0].audienceGain = { newUnderstanding: '理解窗口规则', storyProgress: '推进世界观' };
+  ok(gate(o, 'ending-pull').ok, 'endingPull none 合法');
+  ok(!gate(o, 'ep1-hook'), '不再要求第 1 集 cliffhanger');
 }
 
-// G6 大爆点时机
-{
-  const o = clone();
-  o.payoffs.forEach((b) => (b.level = 'minor'));
-  o.payoffs[3].level = 'major'; // 唯一 major 在第 6 集（最后一集）
-  ok(!gate(o, 'major-early').ok, 'major 只在最后一集被拦');
-  ok(validateOutline(o, 'beats').some((x) => x.includes('大爆点')), 'beats 档就报大爆点');
-}
-{
-  const o = clone();
-  o.payoffs.forEach((b) => (b.level = 'minor'));
-  ok(!gate(o, 'major-early').ok, '一个 major 都没有也被拦');
-}
-
-// G7 三栏齐全
+// 旧 hook / suspense 缺项可识别并由兼容校验拦截
 {
   const o = clone();
   o.episodes[3].suspense = '';
-  ok(!gate(o, 'ep-fields').ok, '缺悬念栏被拦');
-  ok(gate(o, 'ep-fields').detail.includes('4'), '报错点名第 4 集');
+  ok(!gate(o, 'ep-fields').ok, '旧格式缺少 suspense 时兼容门仍能诊断');
+  ok(gate(o, 'ep-fields').detail.includes('4'), '兼容诊断点名第 4 集');
 }
 
 // G8 同框拆解
@@ -393,7 +513,7 @@ ok(RISK_PATTERNS['人群'].test('集市上'), '集市触发人群');
 {
   const o = clone();
   o.payoffs[0].episode = 99;
-  ok(!gate(o, 'refs').ok, '爽点落在不存在的集被拦');
+  ok(!gate(o, 'refs').ok, 'payoff 落在不存在的集被拦');
 }
 
 // G11 叙述体
@@ -419,14 +539,15 @@ ok(validateOutline(null).length === 1, 'null 直接报');
 {
   const o = clone();
   o.params.genre = '';
-  ok(validateOutline(o, 'skeleton').some((x) => x.includes('genre')), '题材缺失被拦——它决定爽点类型');
+  ok(validateOutline(o, 'skeleton').some((x) => x.includes('genre')), '题材缺失被拦——它影响故事设计');
 }
 {
   const o = clone();
-  o.adaptation.cut = [];
-  ok(validateOutline(o, 'skeleton').some((x) => x.includes('没砍')), '抽核却一条没砍被拦');
-  o.params.adaptMode = '忠实';
-  ok(!validateOutline(o, 'skeleton').some((x) => x.includes('没砍')), '忠实改编允许不砍');
+  o.storyDesign = { core: '原创故事', include: [], exclude: [], merge: [], risks: [] };
+  delete o.adaptation;
+  delete o.params.adaptMode;
+  for (const scene of o.scenes) scene.reuseClass = scene.primary ? 'core' : 'recurring';
+  eq(validateOutline(o, 'skeleton').length, 0, '原创项目不需要 adaptMode，也不强制 exclude 非空');
 }
 {
   const o = clone();
@@ -476,7 +597,7 @@ ok(validateOutline(null).length === 1, 'null 直接报');
   delete o.payoffs;
   delete o.episodes;
   eq(validateOutline(o, 'skeleton').length, 0, 'skeleton 档不要求 beats/episodes');
-  ok(validateOutline(o, 'beats').some((x) => x.includes('payoffs 为空')), 'beats 档要求叙事回报表');
+  eq(validateOutline(o, 'beats').length, 0, 'beats 档允许 payoffs 表为空或尚未提供');
   ok(validateOutline(o, 'full').length > 0, 'full 档要求全部');
 }
 
@@ -516,7 +637,7 @@ eq(assets.beatsByType.identity_conflict.join(','), '3', '叙事回报按 taxonom
 const md = renderMarkdown(FIXTURE);
 ok(md.startsWith('# 渡口 · 叙事大纲'), 'MD 标题');
 ok(md.includes('6 集 × 2 分钟'), 'MD 带参数行');
-for (const sec of ['一、改编说明', '二、人物表', '三、叙事回报表', '四、分集梗概', '五、资产清单']) {
+for (const sec of ['一、故事设计', '二、人物表', '三、叙事回报表', '四、分集梗概', '五、资产清单']) {
   ok(md.includes(sec), `MD 有${sec}`);
 }
 ok(md.includes('（由分集数据自动汇总）'), 'MD 标明资产清单是算出来的');
@@ -548,20 +669,20 @@ ok(html.includes('主角 2 · 配角 2 · 功能 1'), '角色卡按档报数');
 
 // 关键决策：拍板三件事落进纸面
 ok(html.includes('关键决策'), '有关键决策区块');
-ok(html.includes('砍了哪条线') && html.includes('合了哪些人') && html.includes('major payoff 落在第几集'), '决策三栏齐全');
+ok(html.includes('纳入') && html.includes('不纳入') && html.includes('合并'), '故事设计包含纳入/排除/合并取舍');
 ok(html.includes('5 个角色位（主角组 2 · 重要配角 2 · 功能性 1）'), '角色位统计是算出来的');
 ok(html.includes('主角组：沈知微、陆行远'), '主角组名单是算出来的');
 ok(html.includes('这意味着：全剧困在渡口一夜之内'), 'cutNote 结论句渲染出来');
-ok(/<i>ep3<\/i>/.test(html) && /<i>ep5<\/i>/.test(html), '大爆点列表带集号');
-ok(html.includes('首个') && html.includes('终局'), '首末大爆点有标记');
+ok(/<i>ep3<\/i>/.test(html) && /<i>ep5<\/i>/.test(html), 'major payoff 列表带集号');
+ok(html.includes('首个') && html.includes('终局'), '首末 major payoff 有标记');
 
-// 爽点节奏：时间轴（不是格子条也不是柱状图）
-eq((html.match(/class="bdot/g) || []).length, 4, '时间轴 4 个爽点节点');
-eq((html.match(/class="bdot major"/g) || []).length, 2, '2 个大爆点实心节点');
+// payoff 节奏时间轴
+eq((html.match(/class="bdot/g) || []).length, 4, '时间轴 4 个 payoff 节点');
+eq((html.match(/class="bdot major"/g) || []).length, 2, '2 个 major payoff 实心节点');
 eq((html.match(/class="tick"/g) || []).length, 6, '6 个集刻度');
 ok(html.includes('class="gapnote"'), '空档标在轴上');
 ok(html.includes('1 集空档'), '空档标注带集数');
-// 空档超阈值要变铁锈红
+// 空档仅显示信息，不再用旧 payoffGap 阈值着色失败
 {
   const o = clone();
   o.params.episodes = 9;
@@ -572,7 +693,7 @@ ok(html.includes('1 集空档'), '空档标注带集数');
     { ep: 9, synopsis: '收束。', hook: 'x', suspense: 'y', sceneIds: ['S01'], characterIds: ['C01'] },
   );
   o.episodes[5].synopsis = '雾还没散。';
-  ok(renderHtml(o).includes('class="gapnote bad"'), '超阈值空档标成铁锈红');
+  ok(renderHtml(o).includes('class="gapnote"') && !renderHtml(o).includes('class="gapnote bad"'), 'payoff 空档仅作信息展示');
 }
 // 长剧折行：60 集两行以上的轴
 {
@@ -581,7 +702,7 @@ ok(html.includes('1 集空档'), '空档标注带集数');
   ok(/viewBox="0 0 1520 352"/.test(renderHtml(o)), '40 集折成两行轴（每行 20 集）');
 }
 
-// 爽点节奏：图 / 表 tab，默认时间轴
+// payoff 节奏：图 / 表 tab，默认时间轴
 eq((html.match(/class="tab[ "]/g) || []).length, 2, '两个 tab');
 ok(html.includes('class="tab on" data-pane="pane-timeline"'), '默认选中时间轴');
 ok(html.includes('class="tabpane on" id="pane-timeline"'), '时间轴面板默认显示');
@@ -644,7 +765,7 @@ ok(html.includes('人群 ×1（第 2 集）'), '折算表带生成难点明细')
 
 // 区块顺序：节奏 → 分集概览 → 场景概览 → 决策 → 调度矩阵 → 折算 → 人物 → 改编说明 → 质量门
 {
-  const order = ['>叙事回报节奏<', '>分集概览<', '>场景概览<', '>关键决策<', '>每集调度矩阵<', '>资产量折算<', '>人物表<', '>改编说明<', '>质量门<'];
+  const order = ['>叙事回报节奏<', '>分集概览<', '>场景概览<', '>关键决策<', '>每集调度矩阵<', '>资产量折算<', '>人物表<', '>故事设计<', '>质量门<'];
   const idx = order.map((s) => html.indexOf(s));
   ok(idx.every((v) => v >= 0) && idx.every((v, i) => i === 0 || v > idx[i - 1]), '区块顺序正确');
 }
@@ -660,8 +781,8 @@ ok(html.includes('gatepill pass'), '页眉徽章是通过态');
   o.episodes[0].hook = '';
   const bad = renderHtml(o);
   ok(bad.includes('<li class="bad">'), '未过的门标 ✗');
-  // 抹掉第 1 集钩子会连坐两道门：ep1-hook + 三栏齐全
-  ok(bad.includes('2 项未过'), '总结行报未过数');
+  // 旧格式的钩子字段为空时，由兼容校验报告缺失。
+  ok(bad.includes('1 项未过'), '总结行报未过数');
   ok(bad.includes('gatepill fail'), '页眉徽章变失败态');
   ok(bad.includes('class="galert"'), 'KPI 带下面弹出病灶横幅');
 }
@@ -697,11 +818,11 @@ ok(html.includes('revokeObjectURL(url), 10000'), 'blob 延后回收——Safari 
 
 ok(html.includes('@media print'), '可打印');
 ok(html.includes('prefers-reduced-motion'), '尊重减少动效');
-ok(html.includes('原文依据'), '改编说明的证据列渲染出来');
+ok(html.includes('原文依据'), '来源素材的证据列渲染出来');
 ok(html.includes('雾一厚，连自己的手都看不清。'), '逐字证据进了报告');
 
 /* ---------------- render 英文界面 ---------------- */
-// 只翻译界面：数据（爽点类型、改编幅度、书名）和质量门 label 原样出
+// 只翻译界面：数据（payoff 类型、故事来源、书名）和质量门 label 原样出
 
 ok(html.includes('<html lang="zh">'), '默认中文界面，lang="zh"');
 
@@ -730,7 +851,7 @@ ok(enHtml.includes('Episode 1'), 'EN 分集卡标题');
 
 const enMd = renderMarkdown(FIXTURE, 'en');
 ok(enMd.startsWith('# 渡口 · Narrative Outline'), 'EN MD 标题');
-ok(enMd.includes('1. Adaptation notes') && enMd.includes('5. Asset list'), 'EN MD 章节标题');
+ok(enMd.includes('1. Story design') && enMd.includes('5. Asset list'), 'EN MD 章节标题');
 // 质量门 label（含【钩子】字样）是数据不翻译，只查界面上的栏目标签
 ok(enMd.includes('**[Hook]**') && !enMd.includes('**【钩子】**'), 'EN MD 钩子栏用英文方括号');
 

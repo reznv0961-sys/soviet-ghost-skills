@@ -183,7 +183,14 @@
         "人群"
       ],
       "payoffs": [],
-      "payoffRationale": "过渡集；推进已建立的冲突，但本集没有独立的叙事回报。"
+      "payoffRationale": "过渡集；推进已建立的冲突，但本集没有独立的叙事回报。",
+      "comicBeats": [
+        {
+          "kind": "procedural_gag",
+          "beat": "乘客依次把湿鞋印擦到同一块旧布上",
+          "function": "把封闭空间里的规矩转成轻微的视觉荒诞"
+        }
+      ]
     },
     {
       "ep": 3,
@@ -228,7 +235,14 @@
       "crowdPlan": "三人戏收进舱内长凳一条轴线，避免多机位穿帮",
       "warnings": [],
       "payoffs": [],
-      "payoffRationale": "过渡集；为延迟兑现的叙事回报做铺垫，但不新增回报。"
+      "payoffRationale": "过渡集；为延迟兑现的叙事回报做铺垫，但不新增回报。",
+      "comicBeats": [
+        {
+          "kind": "bureaucratic_detail",
+          "beat": "船上唯一干燥的位置被用来垫一本没人翻开的登记册",
+          "function": "以不重要的程序物件压住人物真正关心的事"
+        }
+      ]
     },
     {
       "ep": 5,

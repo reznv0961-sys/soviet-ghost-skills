@@ -1,113 +1,130 @@
-# outline.json 结构
+# outline.json 结构（v1.1）
 
-五件套的载体。**模型只管填这份 JSON**，Markdown 和 report.html 由 `render` 渲染出来，资产清单由脚本汇总——五件套是四件模型写 + 一件算出来的。
+outline 是一个故事的设计与执行计划，不是项目世界观 Canon。Markdown、HTML 报告和资产统计由脚本生成。
 
 ```json
 {
-  "source": "书名",
+  "source": "故事名",
   "lang": "zh",
-  "params": { "episodes": 60, "minutesPerEpisode": 2, "genre": "历史错位黑色幽默", "adaptMode": "抽核", "preferences": [] },
-  "adaptation": { "core": "…", "keep": [], "cut": [], "merge": [], "risks": [] },
-  "characters": [ { "id": "C01", "name": "…", "role": "…", "arc": "…", "from": ["原著…", "合并：…"] } ],
-  "scenes": [ { "id": "S01", "name": "…", "primary": true, "reusePlan": "…" } ],
-  "payoffs": [ { "id": "P001", "episode": 1, "level": "major", "type": ["historical_dislocation"], "ontology": "historical_dislocation_A", "setup": "…", "payoff": "…", "theme": "…", "tone": "冷峻克制", "status": "proposed", "userConfirmed": false } ],
-  "historicalResearch": [ { "id": "HR-001", "claim": "…", "status": "RESEARCH_REQUIRED", "storyImpact": "…" } ],
-  "episodes": [ { "ep": 1, "synopsis": "…", "hook": "…", "suspense": "…", "sceneIds": ["S01"], "characterIds": ["C01"], "payoffs": ["P001"], "propIds": ["P01"], "crowdPlan": "…", "warnings": [] } ]
+  "params": {
+    "episodes": 1,
+    "minutesPerEpisode": 8,
+    "genre": "制度荒诞与历史错位",
+    "adaptMode": null,
+    "preferences": []
+  },
+  "canonRefs": [
+    { "id": "CANON-...", "summary": "本故事使用到的既定规则简述", "source": "项目世界观文档" }
+  ],
+  "storyDesign": {
+    "core": "故事核心",
+    "include": [{ "what": "纳入设计", "why": "理由" }],
+    "exclude": [{ "what": "不纳入设计", "why": "理由" }],
+    "merge": [{ "what": "合并设计", "why": "理由" }],
+    "risks": [{ "what": "风险", "why": "处理方式" }]
+  },
+  "sourceAdaptation": {
+    "mode": "抽核",
+    "source": "指定原稿",
+    "notes": [{ "what": "改编说明", "why": "理由", "evidence": "可选逐字依据" }]
+  },
+  "characters": [
+    { "id": "C01", "name": "…", "role": "…", "tier": "lead", "arc": "…", "from": ["原创"] }
+  ],
+  "scenes": [
+    {
+      "id": "S01", "name": "…", "primary": true, "reuseClass": "core", "reusePlan": "…",
+      "productionRisk": { "level": "low", "reasons": [] }
+    }
+  ],
+  "props": [],
+  "payoffs": [
+    {
+      "id": "P001", "episode": 1, "level": "minor",
+      "type": ["historical_dislocation", "identity_conflict"],
+      "ontologies": ["historical_dislocation_A", "identity_conflict_B"],
+      "setup": "…", "payoff": "…", "theme": "…", "tone": "克制",
+      "status": "proposed", "userConfirmed": false
+    }
+  ],
+  "historicalResearch": [
+    {
+      "id": "HR-001", "category": "historical_fact", "claim": "…",
+      "status": "RESEARCH_REQUIRED", "storyImpact": "…"
+    }
+  ],
+  "episodes": [
+    {
+      "ep": 1, "synopsis": "叙述体梗概",
+      "episodePurpose": ["world_reveal", "institutional_satire"],
+      "audienceGain": { "newUnderstanding": "…", "storyProgress": "…" },
+      "endingPull": { "kind": "ironic_image", "content": "…" },
+      "sceneIds": ["S01"], "characterIds": ["C01"], "payoffs": [], "comicBeats": [
+        { "kind": "bureaucratic_detail", "beat": "女主以严肃行政态度提醒对方谨慎回答", "function": "体现时代错位下的制度冷幽默" }
+      ],
+      "productionRisk": { "level": "low", "reasons": [] },
+      "propIds": [], "warnings": []
+    }
+  ]
 }
 ```
+
+## 项目 Canon 与故事设计
+
+- `canonRefs` 可为空；非空时每项包含 `id`、`summary`、`source`。summary 只是依赖索引，不能代替 Canon 原文。
+- Canon 是外部项目级事实源。outline 只能引用，不得自行创建、升级、覆盖或重新定义 Canon；未确认设定不得伪装成 Canon。
+- `storyDesign` 必填，`core` 必须有内容；`include`、`exclude`、`merge`、`risks` 均为数组，条目使用 `{what, why}`。不要求 `exclude` 非空。
+- 仅当故事确实基于原稿时填写可选 `sourceAdaptation`；原创故事不需要该字段。
 
 ## params
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `episodes` | 是 | 总集数，正整数。分集数量必须与它一致 |
-| `minutesPerEpisode` | 是 | 单集时长（分钟） |
-| `genre` | 是 | 题材与项目定位，必须提供；不能据此擅自增加 payoff taxonomy 类型 |
-| `adaptMode` | 是 | `忠实` / `抽核` / `借壳`，只能这三个 |
-| `preferences` | 否 | 用户点名要保的角色、戏 |
-| `thresholds` | 否 | 逐项覆盖质量门阈值：`maxLeads`(5) / `maxSupport`(10) / `maxFunctional`(10) / `maxPayoffGap`(3) / `maxPrimaryScenes`（缺省随集数动态：4 + ⌈集数/10⌉，夹在 5–15）。短篇建议收紧角色档 |
+| `episodes` | 是 | 总集数，正整数；分集数量与它一致 |
+| `minutesPerEpisode` | 是 | 单集时长，正数 |
+| `genre` | 是 | 题材与项目定位 |
+| `adaptMode` | 否 | 仅用于兼容改编来源；`忠实` / `抽核` / `借壳`。原创省略或设为 `null` |
+| `preferences` | 否 | 用户点名保留的人物、场景等 |
+| `thresholds` | 否 | 覆盖角色数、道具数和主场景数阈值。`maxPayoffGap` 是 deprecated legacy 参数，不再作为核心门 |
 
-## adaptation 改编说明
+## 人物、场景与资产
 
-`core` 一句话核心，必填。`keep` / `cut` / `merge` 每条 `{what, why}`，`keep` 至少一条；**`adaptMode` 不是忠实时 `cut` 不能为空**。`keep` 可带 `evidence`——**原文逐字片段**，禁止凭书名脑补的对策就在这：关键取舍要能指回原文。`risks` 每条 `{what, plan}`。
+- 人物 ID 使用全局唯一 `C01` 格式。角色分档为 `lead`、`support`、`functional`；只有非功能性角色必须有 `arc`。
+- 新大纲场景使用 `reuseClass`：`core`（系列核心资产）、`recurring`（预计重复出现）、`episode_only`（少量剧情使用）。旧数据可省略该字段。
+- `episode_only` 场景若只出现一次，必须填写 `reusePlan`；评审报告会标示其单独制作资产的必要性。`productionRisk` 可在场景或分集记录。
+- 新版正式 episode 必须填写 `productionRisk`；没有明显风险时写 `{ "level": "low", "reasons": [] }`。旧 episode 可缺省以兼容存量数据。scene 上的 `productionRisk` 可选。结构为 `{level, reasons}`；level 只能是 `low` / `medium` / `high`，reasons 为字符串数组。推荐标签包括 `vehicle_motion`、`multi_actor_interaction`、`crowd`、`complex_spatial_blocking`、`prop_handoff`、`hand_closeup`、`physical_contact`、`transparent_character`、`moving_door`、`background_parallax`、`text_or_map`、`costume_continuity`、`character_consistency`、`weather`、`complex_camera_motion`。此处只提示下游生产风险，不写分镜或视频 prompt。
+- `props` 可选。`id` 使用 `P01`，`name` 与 `function` 必填，`beatIds` 可引用 payoff ID。
 
-两个可选的**决策补注**，报告的「关键决策」区块会展示：
+## payoff
 
-- `cutNote` — 砍线的结论句（「这意味着：全剧终点是……原著后 30 章基本不用」这种），说清砍完之后故事的终点变成了什么
-- `mergeNote` — 合人的补注，通常写主角组入选理由（谁有完整转变弧）
+- 整份大纲的 `payoffs` 可以是空数组。此时 `beats` 阶段不因 payoff 表为空失败；正式分集仍须逐集通过 payoff / comicBeat 价值门。
+- payoff 是结构性叙事回报，需有 setup、因果发展和 payoff/result，并继续逐项等待用户确认。
+- `type` 为非空数组，可同时使用现有十种 taxonomy 标签；不得新增第十一类。
+- 新格式使用 `ontologies` 数组。一个 payoff 可以有多个 ontology；每个 ontology 必须属于其中一个 `type`。旧 `ontology` 单字符串可兼容读取，标记 deprecated。
+- `level` 仍表示认知层级：`minor` 改变对场景、关系或局部规则的理解；`major` 改变对人物、制度、世界结构、历史关系或主题的整体理解。笑得很响不自动是 major，安静揭示也可能是 major。
+- 正式 episode 只能引用同时满足 `status: "confirmed"` 与 `userConfirmed: true` 的 payoff。
+- payoff 时间间隔、至少一个 major、major 必须早于最后一集均为 deprecated 旧规则，不再构成核心失败条件。
 
-给了就不能是空字符串，`validate` 会拦。major payoff 落点列表**不用另写**——报告从 `payoffs` 里自动算。
+## episodes
 
-## characters 人物表
+- `ep` 从 1 连续编号；`synopsis`、`sceneIds`、`characterIds` 和 `payoffs` 必填。
+- `episodePurpose` 是字符串数组，不锁死枚举。建议：`world_reveal`、`character_development`、`institutional_satire`、`historical_observation`、`relationship_progress`、`long_arc_progress`、`atmosphere`、`setup`、`transition`。
+- 正式分集的 `audienceGain` 要填写 `newUnderstanding` 与 `storyProgress`，分别说明观众新理解和本集推进。
+- `endingPull` 格式为 `{kind, content}`；kind 为 `question`、`world_clue`、`character_reaction`、`ironic_image`、`long_arc`、`none`。`none` 合法且 content 可为空或省略；不要求 cliffhanger。
+- `comicBeats` 是可选数组，每项 `{kind, beat, function}`。kind 是轻量标签，不限制 taxonomy；建议 `dry_capper`、`bureaucratic_detail`、`visual_absurdity`、`historical_mismatch`、`reaction`、`procedural_gag`、`other`。不设 ontology，也不要求逐项用户确认。只写叙事功能和内容，不写正式对白。
+- 每集至少引用一个已确认 payoff，或至少有一个有效 comicBeat；两者兼有为推荐状态。无 payoff 时不再要求 `payoffRationale`。
+- `hook`、`suspense` 是 deprecated legacy 字段；新大纲统一使用 `endingPull`。
+- 单集原则是独立成立 + 弱连续长线，不必人为制造重大悬念。
 
-每个字段都以校验器为准，一个不多一个不少：
+## 历史研究
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `id` | 是 | `C01` 格式，全局唯一，分集靠它引用 |
-| `name` | 是 | 姓名；功能性角色用称呼标签（「急诊医生」） |
-| `role` | 是 | 定位一句话：女主 / 搅局配角 / 渡口的报时人…… |
-| `tier` | 是 | 三档之一，见下表 |
-| `arc` | lead / support 必填 | 人物弧；functional 可省——医生就是来缝针的 |
-| `from` | 是 | **← 改动记录**，非空数组：原著对应谁、合并了谁、纯原创写 `["原创"]` |
-
-- `tier` 只能三档——一刀切的角色上限混淆了「观众要记住谁」和「制作要维护多少张脸」，分档把它拆开：
-
-  | tier | 是谁 | 上限 | 规则 |
-  | --- | --- | --- | --- |
-  | `lead` | 主角组（男女主 + 主反派） | 1–5 人 | `arc` 必填 |
-  | `support` | 有名字的重要配角（亲属、闺蜜、副反派） | ≤ 10 | `arc` 必填 |
-  | `functional` | 功能性角色（医生、秘书、店员） | ≤ 10 | **占脸不占名**：`name` 用称呼标签（「急诊医生」）；`arc` 可省——医生就是来缝针的 |
-
-  无名背景人不进表、不追踪、不限量。
-
-  **这份表是下游 novel-characters 的角色清单**：谁进谁不进、谁是主角组在这里定死，角色设定照着做，不用再判断一遍轻重（`tier` 对应过去就是 `importance`：`lead` → protagonist、`support` → supporting、`functional` → minor）。反过来，手上已经有 cast.json 的话也能映射进来：protagonist/major → `lead`，supporting → `support`，minor → `functional`
-
-## scenes
-
-- `id` 格式 `S01`，全局唯一；`name` 必填；`primary` 必填布尔（主场景上限随集数动态，见 `thresholds`）
-- **在全剧只出现一次的场景必须带 `reusePlan`**（规避方案：复用哪个现有环境资产、换什么时段天气改出来）
-
-## props 叙事道具
-
-- **可选字段**。没写照常通过全部质量门（`prop-cap` 与 `refs` 两道会明说跳过）；写了就按下面查
-- `id` 格式 `P01`，全局唯一；`name` 必填
-- **`function` 必填——这一层唯一要拍板的东西：这件物件在戏里承载什么。** 填不出来说明它不是叙事道具，是场景陈设，那归 `novel-art` 的场景锚点管，不进这张表
-- `beatIds` 可选：保留原字段名以兼容资产汇总，值引用 `payoffs[].id`。写了就必须指向真实 payoff id
-- 上限 `maxProps` 默认 8 件（进 `params.thresholds` 可覆盖）。跟主角数量一个量级——**只收有特写、跨集出现、承载剧情的**
-- 分集用 `episodes[].propIds` 引用。**没有任何一集引用的道具会被 `refs` 门点名**——跟失业角色、空转场景同一个判据
-
-边界：尺度、锚点、状态变体、白底提示词都是 `novel-art` 的活，不在这里定。这张表回答「哪几件物件承载剧情、各自承载什么」，美术层回答「它长什么样、怎么保证六集都长一样」。
-
-## payoffs 叙事回报表
-
-- `id` 格式 `P001`；`level` 只能 `major` / `minor`；`type` 必须是数组，且只能使用 `references/payoff-taxonomy.md` 中的十类之一
-- `ontology` 必须指向一种已定义因果结构；`setup` 与 `payoff` 都必填，不能把 hook 当作 payoff；`theme` 与 `tone` 记录主题作用和执行语调
-- `status` 为 `proposed` / `confirmed` / `rejected` / `revised`；正式进入 `--stage beats` 前，每项都必须为 `status: "confirmed"` 且 `userConfirmed: true`
-- `episode` 是叙事回报的落点；分集用 `episodes[].payoffs` 引用对应 `Pxxx`。没有 payoff 的分集必须写 `payoffRationale`
-- 每集都必须有 `payoffs` 数组；为空时 `payoffRationale` 必填，不能用 hook 或悬念冒充 payoff
-- 硬规则：叙事回报间隔 ≤ `maxPayoffGap`（默认 3），开头结尾无真空；**至少一个 major，且最早的 major 不能落在最后一集**
-- 若需要新增顶级 `type`，先提出理由并暂停等待用户确认；未知类型不能进入 beats/full
-
-## historicalResearch
-
-每项状态为 `CANON` / `PROVISIONAL` / `RESEARCH_REQUIRED`。真实历史事实尚未核实时不得写成 canon；存在未解决的 `RESEARCH_REQUIRED` 时 `--stage full` 必须失败。详细暂停流程见 `references/historical-research.md`。
-
-## episodes 分集梗概
-
-- `ep` 从 1 连续编号，总数等于 `params.episodes`
-- `synopsis` / `hook` / `suspense` 三栏**都必填**——【钩子】【悬念】空了视为未完成
-- **叙述体**：三栏里出现 `「」『』“”` 引号对白就是在写剧本，越界，validate 会拦
-- `sceneIds` / `characterIds` 必填且必须指向已登记的 id；每个角色至少出现一集、每个场景至少用一次
-- `propIds` 可选（写了 `props` 才有意义），必须指向已登记的道具 id；每件道具至少出现一集
-- `characterIds` ≥ 3 的集必须写 `crowdPlan`（同框拆解方案）。**校验按人数判，是代理指标**——如果这一集三人实际不同框（分处不同场次），把这个事实写成方案即可：「三人分处两场，无同框，分场拍」，照样通过
-- `warnings`：梗概里扫到生成难点关键词（雨戏/肢体接触/人群/手部特写）就必须列进来，宁可多报
+`historicalResearch` 条目使用 `id`、`category`、`claim`、`status`、`storyImpact`。category 为 `historical_fact`、`historical_plausibility`、`fictional_institution_design`。历史事实或可行性推演可以在有实质剧情依赖时要求研究；纯架空制度设计不触发历史 STOP。只有尚未解决且会实质改变剧情的历史依赖阻止 full。详细规则见 `historical-research.md`。
 
 ## 校验
 
 ```bash
 node scripts/soviet-ghost-outline.mjs validate outline.json --stage skeleton|beats|full
-node scripts/soviet-ghost-outline.mjs checkup outline.json   # 质量门 ✓/✗
+node scripts/soviet-ghost-outline.mjs checkup outline.json
 ```
 
-stage 就是流程门：骨架草案过 `skeleton`，payoff 用户确认并完成研究 checkpoint 后、**写分集之前必须过 `beats`**；交付前过 `full`。
+`skeleton` 校验故事设计、人物、场景与 Canon 引用；`beats` 额外要求 payoff taxonomy 与人工确认有效；`full` 检查每集价值、生产风险、历史依赖和全部 ID 引用。旧字段 `adaptation`、`ontology`、`hook`、`suspense` 可读取兼容，但新大纲不得继续使用其旧结构。

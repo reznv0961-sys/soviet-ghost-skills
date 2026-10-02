@@ -1,21 +1,20 @@
 # soviet-ghost-outline
 
-《苏联亡灵局》专用叙事结构技能。它从 `novel-outline` 复制并演化，**不修改原技能**；保留结构化大纲、角色分档、场景控制、分批写集、质量门、报告与资产统计，把“爽点”改为必须逐项确认的叙事回报（payoff）。
+《苏联亡灵局》原创系列故事大纲技能。与通用 `novel-outline` 分开维护，不默认把项目当作小说改编。单集原则为**独立成立 + 弱连续长线**：不强求 cliffhanger，每集至少有一个已确认 payoff 或有效 comicBeat。
 
-核心语调：冷峻、克制、官僚荒诞、历史错位、政治寓言。重要叙事回报必须先给用户候选方案并暂停；依赖真实历史的设定必须先核实，未解决时不能通过正式 `full` 校验。
+故事 outline 只通过 `canonRefs` 引用外部项目级 Canon，不创建或改写世界观事实。结构性 payoff 继续逐项等待用户确认；comicBeat 是轻量的荒诞 / 滑稽执行单元，不要求逐项确认，也不需要完整因果结构。历史研究只有在未解决事实会实质改变剧情时才强制暂停；纯架空制度设计不触发 STOP。AI 视频生产风险只做标记，不进入分镜或视频 prompt。
 
 ## 工作流程
 
-1. 收集集数、时长、题材和偏好；读取原稿与用户确认的 canon。
-2. 长文本按章节分卷，短文本直接进入骨架。
-3. 先产出改编说明、人物、场景和叙事回报候选，不写分集。
-4. 展示每项 payoff 的类型、level、ontology、setup、payoff、theme 和风险，暂停等待用户逐项确认。
-5. 对依赖真实历史的内容建立历史研究暂停点；未确认前暂停。
-6. 确认 payoff 后运行 `validate --stage beats`，再由用户拍板骨架。
-7. 按每批最多 10 集生成分集梗概，hook 与 payoff 分开记录。
-8. 运行 full 校验并修复违规，再渲染报告与资产清单。
+1. 收集集数、时长、题材、故事来源、偏好与项目 Canon；原创故事无需 `adaptMode`。
+2. 长文本素材按章节分卷；短文本直接进入故事骨架。
+3. 起草 `storyDesign`、`canonRefs`、人物、场景、道具、payoff 候选与历史研究问题，不写分集。
+4. 展示 payoff 的多标签 type、level、`ontologies`、setup、payoff、theme 和风险，暂停等待用户逐项确认。
+5. 确认必要的历史事实依赖及骨架后运行 `validate --stage beats`。
+6. 每批最多 10 集写作；每集包含 `episodePurpose`、`audienceGain`、`endingPull`、`productionRisk`，并有 payoff 或 comicBeat。没有明显生产风险时仍填写 `{ "level": "low", "reasons": [] }`。
+7. 运行 full 校验并修复问题，再渲染报告与资产清单。
 
-详细规则见 [SKILL.md](SKILL.md) 与 `references/`。
+详细流程见 [SKILL.md](SKILL.md)，JSON 字段见 [schema.md](references/schema.md)。
 
 ## CLI
 
@@ -33,7 +32,7 @@ node scripts/soviet-ghost-outline.mjs assets outline.json
 node scripts/selftest.mjs
 ```
 
-`params.thresholds.maxPayoffGap` 默认 3 集。既有报告布局、离线渲染、体检与资产统计保留；调性关键词扫描只发警告，不自动判失败。
+`beats` 阶段允许整个 `payoffs` 表为空；正式分集必须逐集满足 payoff 或 comicBeat 质量门。调性关键词扫描只发 warning，不自动判失败。
 
 ## 苏联笑话参考
 
@@ -41,12 +40,13 @@ node scripts/selftest.mjs
 
 ## 核心文件
 
-- `SKILL.md`：Agent 工作流与强制暂停点
+- `SKILL.md`：工作流程与必须确认的暂停点
 - `scripts/soviet-ghost-outline.mjs`：分卷、校验、体检、渲染、资产汇总
 - `scripts/selftest.mjs`：确定性自测，不调用模型
-- `references/schema.md`：大纲数据结构
+- `references/schema.md`：v1.1 大纲结构与旧字段兼容说明
 - `references/payoff-taxonomy.md`、`payoff-ontology.md`：固定类型与因果结构
-- `references/tone-bible.md`、`historical-research.md`、`canon-rules.md`、`anti-patterns.md`：项目约束
-- `examples/ep01-outline.json`：EP01 验收样例
+- `references/episode-pass.md`、`outline-pass.md`、`historical-research.md`：写作与研究流程
+- `references/tone-bible.md`、`canon-rules.md`、`anti-patterns.md`：项目约束
+- `examples/ep01-outline.json`：待人工重写的旧样例，不是 Canon 或 v1.1 黄金样例
 
 原始通用版仍位于 `skills/novel-outline/`，与本 skill 独立。

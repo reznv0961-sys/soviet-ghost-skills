@@ -1,29 +1,31 @@
-# 分集梗概 · 分批写作
+# 分集梗概 · 独立成立，弱连续推进
 
-只有用户拍板骨架且所有 payoff 都已确认后，才能进入此步骤。每批最多 10 集。每批输入已确认的骨架、负责的集数范围，以及落在该范围内的已确认 payoff。只输出分集 JSON 数组。
+只有用户确认骨架且所有拟引用 payoff 都已确认后才能写分集。每批最多 10 集。每集原则上独立成立，可以推进人物关系、机构秘密或社区长线，不要求 cliffhanger。
 
-## 每集必填的三栏
+## 每集必须回答
 
-| 字段 | 要求 |
-| --- | --- |
-| `synopsis` | 用克制的叙述体说明本集发生的事，不写引号对白。 |
-| `hook` | 推动观众继续看下一集的问题或牵引点。hook 不是 payoff。 |
-| `suspense` | 尚未解决、仍然悬而未决的线索或预期。 |
+1. `synopsis`：这一集发生什么？使用克制叙述体，不写正式对白。
+2. `episodePurpose`：这一集为什么存在？使用开放字符串数组。可参考 `world_reveal`、`character_development`、`institutional_satire`、`historical_observation`、`relationship_progress`、`long_arc_progress`、`atmosphere`、`setup`、`transition`。
+3. `audienceGain`：观众看完多理解了什么（`newUnderstanding`）？本集推进了什么（`storyProgress`）？
+4. `payoffs`：是否兑现已确认的结构性叙事回报？不得自行新增或更改 payoff。
+5. `comicBeats`：至少提供一个有效荒诞/滑稽执行单元，或引用至少一个已确认 payoff。可两者兼有。Comic beat 不要求 setup-payoff 因果链，也不需要逐项用户确认。
+6. 长线：是否推进弱连续的人物、制度、世界、历史或关系线；没有推进时不必硬加悬念。
+7. `endingPull`：结尾用问题、世界线索、人物反应、反讽画面、长线牵引，或 `none`。完整的荒诞镜头和克制反应可以自然收束，不要人为制造重大悬念。
+8. `productionRisk`：每个新版 episode 必填，标注 AI 视频生成风险等级与原因；没有明显风险时填写 `{ "level": "low", "reasons": [] }`。旧 episode 可缺省以兼容存量数据。
 
-## Payoff 与调性规则
+## Comic beat 写法
 
-- 在 `episodes[].payoffs` 中引用已批准的 payoff ID；写分集时不得新增或改动 payoff 决策。
-- 引用的 payoff 落点必须与 `payoffs[].episode` 一致。
-- 若本集没有 payoff，填写 `payoffs: []`，并在 `payoffRationale` 说明本集仍值得保留的理由。
-- 每集都要回答：观众获得了什么新理解；本集推进了什么（世界规则、人物、制度、历史错位或关系）；本集的 payoff 是什么；若没有 payoff，本集为何重要；结尾如何推动观众继续看。
-- payoff 必须通过 setup、行动和结果兑现。悬念式结尾本身不算 payoff。
-- 保持克制调性：让制度人物把荒谬当作日常；避免主题说教、英雄式升级、脸谱化反派、夸张反应，以及仅为制造 major 而强行反转。
-- 不得编写未经批准的 payoff 候选、类型或落点。若分集无法成立且必须修改其中任一项，应暂停询问用户。
-- 用户确认的 canon 不得擅自更改。若写作中出现新的真实历史依赖，停止并建立历史研究暂停点。
+使用 `{kind, beat, function}`，kind 是轻量标签，可以自定义合理值，不建立 ontology 或大型 taxonomy。描述一个简短动作、行政细节、视觉荒诞或反应及其叙事功能；不要扩写成正式对白。
 
-## 延续的制作约束
+例如：“女主以严肃行政态度提醒 Karl 谨慎回答”，不要在 outline 中写完整台词。正式对白由下游 script skill 撰写。
 
-- `sceneIds` 与 `characterIds` 只能引用已拍板骨架中的 ID。
-- 如果同一集列出三名或更多角色，填写 `crowdPlan`，或说明他们分处不同场景。
-- 梗概出现雨戏、肢体接触、人群或手部特写时，在 `warnings` 中登记生成难点。
-- 只写本批负责的集数范围；合并时按集数排序。
+## 生产与连续性约束
+
+- `sceneIds`、`characterIds`、`propIds` 只能引用已确认骨架中的 ID。
+- `episodePurpose` 为字符串数组；`audienceGain.newUnderstanding` 与 `audienceGain.storyProgress` 在正式 episode 中都应有内容。
+- `endingPull.kind` 可使用 `question`、`world_clue`、`character_reaction`、`ironic_image`、`long_arc`、`none`。`none` 不失败。
+- 每集至少引用一个 `status: confirmed` 且 `userConfirmed: true` 的 payoff，或包含一条字段齐全的 comicBeat。
+- 三人以上角色若确实同框，填写 `crowdPlan`；分场出现则说明不是同框。
+- 生产风险字段可放在 episode 或 scene，结构为 `{level: low|medium|high, reasons: []}`。推荐覆盖车辆运动、多人互动、复杂空间调度、道具交接、透明角色、移动门、地图文字、服装连续性、角色一致性、天气和复杂运镜等风险。
+- 只写本批负责的集数范围，合并时按集数排序。
+- 新写 `endingPull`，不再依赖旧 `hook` / `suspense`。不得擅自改变项目 Canon。
